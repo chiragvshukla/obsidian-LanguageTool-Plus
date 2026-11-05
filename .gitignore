@@ -1,0 +1,51 @@
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+secrets.*
+credentials.*
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.uv/
+dist/
+build/
+*.egg-info/
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# Node / Obsidian plugin build output
+node_modules/
+plugins/obsidian/main.js
+plugins/obsidian/*.map
+
+# Obsidian vault internals
+.obsidian/
+*.obsidian/
+
+# Runtime data (keep directory placeholders)
+data/logs/*
+!data/logs/.gitkeep
+data/cache/*
+!data/cache/.gitkeep
+
+# Local models
+models/
+*.gguf
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp

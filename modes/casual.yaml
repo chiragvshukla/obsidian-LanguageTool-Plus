@@ -1,0 +1,11 @@
+id: casual
+label: Casual
+description: Notes, chat, and informal writing. Grammar only, no style nagging.
+level: default
+enabled_categories: []
+disabled_categories:
+  - STYLE
+  - COLLOQUIALISMS
+  - REDUNDANCY
+prompt: prompts/de/casual.md
+temperature: 0.4

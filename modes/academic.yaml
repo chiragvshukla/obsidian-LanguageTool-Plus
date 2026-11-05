@@ -1,0 +1,13 @@
+id: academic
+label: Academic
+description: Papers and reports. Picky, with redundancy and style checks.
+level: picky
+enabled_categories:
+  - STYLE
+  - REDUNDANCY
+  - TYPOGRAPHY
+  - GENDER_NEUTRALITY
+disabled_categories:
+  - COLLOQUIALISMS
+prompt: prompts/de/academic.md
+temperature: 0.1

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Custom German rules for LanguageToolPlus. Loaded by LanguageTool from
+  /org/languagetool/rules/de/grammar_custom.xml in the custom image.
+
+  Keep rules small, tested, and written from scratch. Do not copy rule text
+  from LanguageTool or from non-open sources.
+-->
+<rules>
+  <category id="LT_PLUS" name="LanguageToolPlus">
+    <rule id="LT_PLUS_DOPPELTES_UND" name="Doppeltes „und“">
+      <pattern>
+        <token case_sensitive="no">und</token>
+        <token case_sensitive="no">und</token>
+      </pattern>
+      <message>Doppeltes „und“. Streiche eines davon.</message>
+      <example correction="und">Wir gehen <marker>und und</marker> kommen wieder.</example>
+    </rule>
+  </category>
+</rules>

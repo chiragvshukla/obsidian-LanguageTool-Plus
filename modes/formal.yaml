@@ -1,0 +1,12 @@
+id: formal
+label: Formal
+description: Business correspondence and official writing. Picky, style-aware.
+level: picky
+enabled_categories:
+  - STYLE
+  - REDUNDANCY
+  - COLLOQUIALISMS
+  - TYPOGRAPHY
+disabled_categories: []
+prompt: prompts/de/formal.md
+temperature: 0.2

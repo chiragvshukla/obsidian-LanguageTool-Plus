@@ -1,0 +1,3 @@
+# German words that should not be flagged. One word per line.
+# Keep this list small; per-user words belong in data/dictionary/de.txt.
+LanguageToolPlus

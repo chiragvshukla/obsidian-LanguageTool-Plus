@@ -1,0 +1,12 @@
+id: business
+label: Business
+description: Emails and proposals. Picky, concise, no colloquialisms.
+level: picky
+enabled_categories:
+  - STYLE
+  - REDUNDANCY
+  - COLLOQUIALISMS
+  - TYPOGRAPHY
+disabled_categories: []
+prompt: prompts/de/business.md
+temperature: 0.2

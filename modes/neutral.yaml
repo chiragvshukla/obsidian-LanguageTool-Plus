@@ -1,0 +1,10 @@
+id: neutral
+label: Neutral
+description: Default mode. Correct grammar and spelling without style pressure.
+level: default
+enabled_categories: []
+disabled_categories:
+  - STYLE
+  - COLLOQUIALISMS
+prompt: prompts/de/neutral.md
+temperature: 0.2

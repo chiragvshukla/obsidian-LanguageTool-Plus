@@ -1,0 +1,23 @@
+# Gateway-level terminology rules.
+#
+# These complement LanguageTool: every match is emitted as a synthetic
+# LanguageTool-shaped match, so the Obsidian plugin needs no changes.
+#
+# Schema:
+#   terms[]:
+#     id          unique string
+#     languages   list of language codes the rule applies to
+#     pattern     Python regular expression
+#     message     short explanation shown in the popover
+#     replacement suggested text (optional)
+#     modes       list of mode ids; empty or omitted means all modes
+#
+# Rules must be written from scratch and reviewed for false positives.
+
+terms:
+  - id: email_hyphen
+    languages: [de]
+    pattern: '(?<!\w)Email(?!\w)'
+    message: 'Schreibe „E-Mail“ mit Bindestrich.'
+    replacement: E-Mail
+    modes: [formal, business, academic]
