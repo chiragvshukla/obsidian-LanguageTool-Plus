@@ -18,7 +18,7 @@ SDK pointed at `LLM_BASE_URL`; do not hand-roll HTTP.
 |---|---|---|
 | `LLM_BASE_URL` | OpenAI-compatible base URL | `http://127.0.0.1:11434/v1` |
 | `LLM_API_KEY` | API key; `ollama` for local | `ollama` |
-| `LLM_MODEL` | Model identifier | `qwen2.5:14b-instruct` |
+| `LLM_MODEL` | Model identifier | `gemma4:e4b-it-q4_K_M` |
 | `LLM_TIMEOUT_SECONDS` | Per-request timeout | `30` |
 | `LLM_MAX_TOKENS` | Response cap | `1024` |
 | `LLM_CONTEXT_CHARS` | Conservative chunk budget | `12000` |
@@ -47,8 +47,11 @@ Require JSON:
 }
 ```
 
-Use `response_format={"type": "json_object"}`. Probe for `json_schema` and use
-it only if the endpoint accepts it. Always validate; never trust the flag.
+Always set `response_format`. Probe for `json_schema` and use it if the
+endpoint accepts it; otherwise send
+`response_format={"type": "json_object"}`. Observed with the default local
+model: without the flag it spends hundreds of tokens on reasoning and wraps the
+JSON in a code fence; with it, output is clean and about 5x faster.
 
 ## Validators
 

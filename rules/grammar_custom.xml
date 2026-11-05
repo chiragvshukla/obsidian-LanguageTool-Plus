@@ -13,7 +13,7 @@
         <token case_sensitive="no">und</token>
         <token case_sensitive="no">und</token>
       </pattern>
-      <message>Doppeltes „und“. Streiche eines davon.</message>
+      <message>Doppeltes „und“. Streiche eines davon.<suggestion>und</suggestion></message>
       <example correction="und">Wir gehen <marker>und und</marker> kommen wieder.</example>
     </rule>
   </category>

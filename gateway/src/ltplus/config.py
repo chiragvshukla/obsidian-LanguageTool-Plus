@@ -11,7 +11,10 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     """Gateway settings. Every field has a safe local default."""
 
-    model_config = SettingsConfigDict(env_file=None, extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=(".env", "../.env"),
+        extra="ignore",
+    )
 
     # LanguageTool
     lt_url: str = "http://127.0.0.1:8010"
@@ -20,7 +23,7 @@ class Settings(BaseSettings):
     # OpenAI-compatible LLM
     llm_base_url: str = "http://127.0.0.1:11434/v1"
     llm_api_key: str = "ollama"
-    llm_model: str = "qwen2.5:14b-instruct"
+    llm_model: str = "gemma4:e4b-it-q4_K_M"
     llm_timeout_seconds: float = 30.0
     llm_max_tokens: int = 1024
     llm_context_chars: int = 12000

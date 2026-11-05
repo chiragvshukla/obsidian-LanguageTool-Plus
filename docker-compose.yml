@@ -1,60 +1,14 @@
 name: languagetoolplus
 
+# Only LanguageTool runs in a container. Ollama and the gateway run natively on
+# the host and are addressed purely by URL (LT_URL, LLM_BASE_URL in .env).
 services:
   languagetool:
-    build:
-      context: .
-      dockerfile: docker/languagetool/Dockerfile
+    image: erikvl87/languagetool:latest
     ports:
       - "127.0.0.1:8010:8010"
-    environment:
-      Java_Xms: 512m
-      Java_Xmx: 1g
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8010/v2/languages"]
-      interval: 30s
-      timeout: 5s
-      retries: 5
-      start_period: 45s
-
-  ollama:
-    image: ollama/ollama:latest
-    ports:
-      - "127.0.0.1:11434:11434"
     volumes:
-      - ollama:/root/.ollama
+      # LanguageTool loads grammar_custom.xml from its rules directory at
+      # startup when the file exists. No rebuild needed.
+      - ./rules/grammar_custom.xml:/LanguageTool/org/languagetool/rules/de/grammar_custom.xml:ro
     restart: unless-stopped
-
-  gateway:
-    build:
-      context: .
-      dockerfile: gateway/Dockerfile
-    ports:
-      - "127.0.0.1:8077:8077"
-    environment:
-      LT_URL: http://languagetool:8010
-      LLM_BASE_URL: http://ollama:11434/v1
-      LLM_API_KEY: ollama
-      LLM_MODEL: ${LLM_MODEL:-qwen2.5:14b-instruct}
-      GATEWAY_HOST: 0.0.0.0
-      GATEWAY_PORT: 8077
-      LOG_LEVEL: ${LOG_LEVEL:-INFO}
-      DEFAULT_MODE: ${DEFAULT_MODE:-neutral}
-      DEFAULT_LANGUAGE: ${DEFAULT_LANGUAGE:-de-DE}
-      MODES_DIR: /app/modes
-      RULES_DIR: /app/rules
-      PROMPTS_DIR: /app/prompts
-      DICTIONARY_DIR: /app/data/dictionary
-    volumes:
-      - ./modes:/app/modes:ro
-      - ./rules:/app/rules:ro
-      - ./prompts:/app/prompts:ro
-      - ./data/dictionary:/app/data/dictionary
-    depends_on:
-      languagetool:
-        condition: service_healthy
-    restart: unless-stopped
-
-volumes:
-  ollama:

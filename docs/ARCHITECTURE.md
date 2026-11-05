@@ -28,14 +28,22 @@ There is no database.
 
 ### LanguageTool
 
-- Upstream image `erikvl87/languagetool`, extended by
-  `docker/languagetool/Dockerfile`.
-- Runs unmodified. We do not patch its Java.
+- Prebuilt upstream image `erikvl87/languagetool`, unmodified. No custom build.
+- The only container in the stack.
 - Port `8010`, bound to `127.0.0.1` on the host.
-- Customisations are files only:
-  - `grammar_custom.xml` → `/LanguageTool/org/languagetool/rules/de/`
-  - `spelling-de.txt` → appended to
-    `/LanguageTool/org/languagetool/resource/de/hunspell/spelling.txt`
+- Customisation is a single read-only bind mount:
+  `rules/grammar_custom.xml` →
+  `/LanguageTool/org/languagetool/rules/de/grammar_custom.xml`.
+  `Language.getRuleFileNames()` loads that file automatically when it exists,
+  so a rule change means restarting the container, not rebuilding an image.
+- Personal spelling words are handled by the gateway dictionary
+  (`data/dictionary/`), not by editing Hunspell data.
+
+### Ollama / LLM
+
+- Not containerized and not part of this repository.
+- Runs as a host process, addressed only through `LLM_BASE_URL`.
+- Any OpenAI-compatible server can replace it.
 
 ### Gateway
 
@@ -87,7 +95,7 @@ implementation. They are explicit rewrite actions.
 |---|---|---|
 | Mode profiles | `modes/*.yaml` | repo |
 | Style rules | `rules/grammar_custom.xml`, `rules/lexicon.yaml` | repo |
-| Personal dictionary | `data/dictionary/<lang>.txt` | mounted volume |
+| Personal dictionary | `data/dictionary/<lang>.txt` | repo working tree |
 | LLM cache | process memory (LRU) | lost on restart |
 | Logs | stdout / files | optional |
 

@@ -20,10 +20,11 @@ The upstream plugin already works against the gateway in pass-through mode.
 
 ## Requirements
 
-- Docker Desktop (or Docker Engine + Compose)
-- [uv](https://docs.astral.sh/uv/) for local development
+- Docker Desktop (or Docker Engine + Compose) for LanguageTool
+- [uv](https://docs.astral.sh/uv/) for the gateway
 - Obsidian
-- Optional: a local LLM served by Ollama, or any OpenAI-compatible API
+- An OpenAI-compatible LLM endpoint. Ollama is the local default but is not
+  part of this repository: it runs natively and is addressed by URL.
 
 ## Quick start
 
@@ -31,12 +32,20 @@ The upstream plugin already works against the gateway in pass-through mode.
 Copy-Item .env.example .env
 # edit .env if needed; never commit it
 
-docker compose up -d languagetool ollama
-ollama pull qwen2.5:14b-instruct
-docker compose up -d gateway
+# LanguageTool (the only container)
+docker compose up -d languagetool
+
+# Gateway, natively
+cd gateway
+uv sync
+uv run uvicorn ltplus.main:app --host 127.0.0.1 --port 8077
 
 Invoke-RestMethod http://127.0.0.1:8077/healthz
 ```
+
+Ollama is expected to be running already, at the URL in `LLM_BASE_URL`
+(`http://127.0.0.1:11434/v1` by default). Any compatible server works; the
+gateway knows nothing about which one.
 
 In Obsidian, install the LanguageTool plugin and set its endpoint to
 `http://127.0.0.1:8077` (the plugin appends `/v2` itself). Until Phase 1 is
@@ -46,6 +55,9 @@ implemented, point it at `http://127.0.0.1:8010` for plain LanguageTool.
 
 All runtime configuration is environment-based. See `.env.example`. There are
 no committed secrets. The gateway never logs document text by default.
+
+Only LanguageTool is containerized. The gateway and the LLM are plain host
+processes addressed by `LT_URL` and `LLM_BASE_URL`.
 
 ## Repository layout
 

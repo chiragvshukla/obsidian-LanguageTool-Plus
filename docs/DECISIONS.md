@@ -80,3 +80,61 @@ request per note.
 plus a prompt file. No code branches per mode.
 
 **Consequences:** adding a mode is a config change; invalid YAML fails startup.
+
+## ADR-008 — External services are endpoints, not containers
+
+**Status:** accepted
+
+**Context:** Ollama and the gateway were initially placed in
+`docker-compose.yml`. Both already run natively, and bundling them duplicated
+models and created port and networking problems without benefit.
+
+**Decision:** only LanguageTool is containerized. Ollama and the gateway run as
+host processes. Every external service is addressed by a URL
+(`LT_URL`, `LLM_BASE_URL`), never assumed to be in the same compose project.
+
+**Consequences:** one container, no `host.docker.internal` special cases for
+the default setup, no duplication of models. A clean-machine deployment can
+later add an optional compose profile, but it must stay opt-in.
+
+## ADR-009 — Mount custom rules instead of building a custom image
+
+**Status:** accepted
+
+**Context:** the custom German rules are a single XML file. Building a custom
+LanguageTool image requires Maven and a 10–20 minute compile for every change.
+
+**Decision:** use the prebuilt `erikvl87/languagetool` image and bind-mount
+`rules/grammar_custom.xml` into the German rules directory. Verified against
+upstream source: `Language.getRuleFileNames()` loads
+`JLanguageTool.CUSTOM_PATTERN_FILE` (`grammar_custom.xml`) when the file exists.
+
+**Consequences:** rule changes need only a container restart. We cannot add
+Java-implemented rules this way, which is already out of scope.
+
+## ADR-010 — Always send `response_format` to the LLM
+
+**Status:** accepted
+
+**Context:** the local default model is a reasoning model. Without
+`response_format` it spends ~700 tokens on hidden reasoning, answers in 6.9 s,
+and wraps JSON in a Markdown code fence. With `response_format` it emits clean
+JSON in 1.2–1.8 s. Ollama accepts both `json_object` and `json_schema`.
+
+**Decision:** every structured call sets `response_format`. Prefer
+`json_schema`; fall back to `json_object` if the endpoint rejects it. Validate
+the parsed object regardless of what the server accepts.
+
+**Consequences:** faster rewrites and no fence-stripping. Providers without
+JSON mode still work, but their output goes through the full validator chain.
+
+## Phase 0 findings
+
+- LanguageTool: prebuilt image + bind-mounted `grammar_custom.xml` works; the
+  custom Maven image is unnecessary.
+- Locale: the image runs without `LANG`, but Java 17 on Alpine still decodes
+  UTF-8 resources correctly. No locale override is needed.
+- Plugin request shape: taken from upstream source; a live capture lands with
+  Phase 1.
+- LLM: see ADR-010. Model quality on one sample was imperfect, so validators
+  are load-bearing.

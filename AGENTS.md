@@ -49,8 +49,8 @@ in-memory cache.
 
 - No absolute paths, hostnames, ports, usernames, GPU IDs, or model names
   hard-coded in source. Use `gateway/src/ltplus/config.py` and `.env.example`.
-- Code must run on a clean machine from `docker compose up` plus the documented
-  model pull.
+- Code must run on a clean machine from `docker compose up -d languagetool`,
+  `uv sync`, and any OpenAI-compatible endpoint the user configures.
 - Do not assume Windows, Linux, or macOS specifics unless isolated behind a
   documented boundary.
 
@@ -99,9 +99,8 @@ in-memory cache.
 ```
 AGENTS.md                 this file
 docs/                     architecture, plan, standards, security, licensing
-docker-compose.yml        LanguageTool + gateway + Ollama
-docker/languagetool/      custom LT image (custom rules, spelling additions)
-gateway/                  FastAPI gateway (Python 3.12, uv)
+docker-compose.yml        LanguageTool only (rules bind-mounted, no custom image)
+gateway/                  FastAPI gateway (Python 3.12, uv, runs natively)
   src/ltplus/             application package
   tests/                  unit and integration tests
 modes/                    declarative writing-mode profiles
@@ -125,10 +124,12 @@ uv run mypy src
 
 ```powershell
 # from repository root
-docker compose up -d languagetool ollama
-ollama pull qwen2.5:14b-instruct   # or any configured model
-docker compose up -d gateway
-.\scripts\check.ps1
+docker compose up -d languagetool
+
+cd gateway
+uv run uvicorn ltplus.main:app --host 127.0.0.1 --port 8077
+
+# Ollama is external; it is addressed only through LLM_BASE_URL.
 ```
 
 ## 7. Definition of done
