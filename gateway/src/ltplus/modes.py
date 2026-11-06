@@ -25,7 +25,7 @@ def load_modes(directory: Path) -> dict[str, Mode]:
         raise ModeConfigError(f"modes directory not found: {directory}")
 
     modes: dict[str, Mode] = {}
-    for path in sorted(directory.glob("*.yaml")):
+    for path in sorted(directory.glob("*.y*ml")):
         try:
             raw = yaml.safe_load(path.read_text(encoding="utf-8"))
         except (OSError, UnicodeDecodeError, yaml.YAMLError) as exc:

@@ -22,6 +22,14 @@ def test_loads_valid_modes(tmp_path: Path) -> None:
     assert modes["formal"].enabled_categories == ["STYLE"]
 
 
+def test_loads_yml_extension(tmp_path: Path) -> None:
+    (tmp_path / "formal.yml").write_text(VALID, encoding="utf-8")
+
+    modes = load_modes(tmp_path)
+
+    assert modes["formal"].level == "picky"
+
+
 def test_rejects_id_mismatch(tmp_path: Path) -> None:
     (tmp_path / "other.yaml").write_text(VALID, encoding="utf-8")
 

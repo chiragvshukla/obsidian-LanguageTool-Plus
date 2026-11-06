@@ -16,8 +16,7 @@
 - No mutable module-level state except a settings singleton and the cache.
 - No bare `except`. Catch specific exceptions and preserve context with
   `raise ... from exc`.
-- Every external call has a timeout. Retries are bounded and only for
-  idempotent operations.
+- Every external call has a timeout.
 - Validate at trust boundaries: request bodies, LLM output, YAML, XML.
 - Do not log document text, prompts, completions, or secrets. Log IDs, counts,
   durations, and error classes.
@@ -62,7 +61,7 @@
 
 ## Performance budgets
 
-- Inline check p95 < 300 ms on localhost (LanguageTool only).
+- Inline check p95 < 100 ms steady state on localhost; gateway overhead p95 < 50 ms.
 - Rewrite p95 < 5 s locally with the configured model.
 - Cache lookups O(1); bounded memory.
 

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  Custom German rules for LanguageToolPlus. Loaded by LanguageTool from
-  /org/languagetool/rules/de/grammar_custom.xml in the custom image.
+  Custom German rules for LanguageToolPlus. Mounted into LanguageTool at
+  /LanguageTool/org/languagetool/rules/de/grammar_custom.xml.
 
   Keep rules small, tested, and written from scratch. Do not copy rule text
   from LanguageTool or from non-open sources.

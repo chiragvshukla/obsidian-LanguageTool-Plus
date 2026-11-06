@@ -19,13 +19,5 @@ jobs:
       - uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
-      - name: Install
-        run: uv sync --frozen
-      - name: Lint
-        run: uv run ruff check .
-      - name: Format
-        run: uv run ruff format --check .
-      - name: Types
-        run: uv run mypy src
-      - name: Tests
-        run: uv run pytest
+      - name: Check
+        run: pwsh ../scripts/check.ps1
