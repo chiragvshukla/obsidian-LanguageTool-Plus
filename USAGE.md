@@ -298,7 +298,6 @@ npm run lint
 ```
 
 The gateway suite mocks LanguageTool and the LLM; it needs neither running.
-`npm run test:e2e` is the optional Obsidian harness.
 
 ## 10. Troubleshooting
 

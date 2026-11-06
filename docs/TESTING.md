@@ -8,7 +8,6 @@
 | Integration | Gateway ↔ mocked LanguageTool / LLM | respx, httpx |
 | Golden | Deterministic LanguageTool results per mode | pytest + fixtures |
 | Eval | LLM quality on a fixed German corpus | pytest marker `eval` |
-| End-to-end | Obsidian plugin ↔ gateway | plugin's wdio harness, later |
 | Smoke | `docker compose up`, healthchecks | script |
 
 ## Rules

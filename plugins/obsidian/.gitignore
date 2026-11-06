@@ -4,4 +4,3 @@ main.js
 esbuild.config.local.mjs
 issues.json
 .obsidian-cache/
-test/vaults/demo/

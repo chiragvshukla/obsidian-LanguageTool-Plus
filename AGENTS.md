@@ -1,7 +1,7 @@
 # AGENTS.md — LanguageToolPlus
 
-Guidance for AI agents and humans working in this repository. Read this file,
-`docs/ARCHITECTURE.md`, and `docs/PLAN.md` before changing anything.
+Guidance for AI agents and humans working in this repository. Read this file
+and `docs/ARCHITECTURE.md` before changing anything.
 
 ## 1. What this project is
 
@@ -139,7 +139,7 @@ uv run uvicorn ltplus.main:app --host 127.0.0.1 --port 8077
 
 ## 8. Workflow
 
-1. Read `docs/PLAN.md`; pick one phase task.
+1. Agree the change with the user; keep it to one concern.
 2. Confirm ambiguity with the user before coding.
 3. Write a failing test.
 4. Implement the smallest change that passes.

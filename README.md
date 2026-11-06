@@ -128,7 +128,6 @@ See `AGENTS.md` §5 and `docs/ARCHITECTURE.md`.
 ## Documentation
 
 - [`USAGE.md`](USAGE.md) — install, run, build, update, troubleshoot
-- `docs/PLAN.md` — phases and acceptance criteria
 - `docs/ARCHITECTURE.md` — components and request flow
 - `docs/OPERATIONS.md` — health checks, restart, backup, restore
 - `docs/RULES.md` — add dictionary words, term rules, and German grammar rules

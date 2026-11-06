@@ -2,7 +2,7 @@
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
-$gateway = Join-Path $PSScriptRoot "..\gateway"
+$gateway = Join-Path $PSScriptRoot "../gateway"
 Push-Location $gateway
 try {
     if ($env:CI) { uv sync --frozen } else { uv sync }

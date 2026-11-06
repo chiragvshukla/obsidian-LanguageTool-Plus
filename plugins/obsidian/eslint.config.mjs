@@ -9,9 +9,7 @@ export default tseslint.config(
       "node_modules/",
       "node_modules.bak/",
       ".obsidian-cache/",
-      "test/",
-      "*.mjs",
-      "wdio.conf.mts"
+      "*.mjs"
     ]
   },
 
