@@ -75,7 +75,9 @@ There is no database.
 4. Gateway forwards the request to LanguageTool.
 5. Gateway filters matches:
    - drop words in `data/dictionary/<language>.txt` (read per request),
-   - apply `rules/lexicon.yaml` term rules (loaded at startup).
+   - apply `rules/lexicon.yaml` term rules (loaded at startup),
+   - add at most one document-consistency match per issue type
+     (`consistency.py`).
 6. Gateway returns LanguageTool-shaped JSON.
 
 LLM suggestions are never merged into the inline path in the first

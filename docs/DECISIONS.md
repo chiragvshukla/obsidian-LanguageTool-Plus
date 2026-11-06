@@ -189,6 +189,27 @@ cannot be reached by accident. The validator chain is the quality boundary, so
 it must run on every rewrite. `shortcut: rewrites are single-chunk; selections
 over `LLM_CONTEXT_CHARS` return `413 text_too_long` until chunking is added.`
 
+## ADR-014 — Consistency checks emit one match per issue type
+
+**Status:** accepted
+
+**Context:** a document can mix `Sie` and `du`, date formats, or terminology.
+Reporting every occurrence would drown the user and duplicate deterministic
+rules that already mark each wrong spelling.
+
+**Decision:** the gateway runs a document-level pass after LanguageTool and the
+lexicon. It returns at most one synthetic match per issue type
+(`CONSISTENCY_DU_SIE`, `CONSISTENCY_DATE_FORMAT`,
+`CONSISTENCY_NUMBER_FORMAT`, plus one terminology notice per lexicon term),
+placed at the point where the style changes or at the canonical term. Matches
+are LanguageTool-shaped and gated by `disabledRules`, `disabledCategories`, and
+`enabledOnly` like the other gateway rules.
+
+**Consequences:** the plugin needs no new UI. The address check is a pronoun
+heuristic; `shortcut: a lone Sie is ambiguous, upgrade to a tagger if false
+alarms matter.` Terminology notices reuse the term's rule id, so disabling the
+term disables both its per-occurrence and its consistency match.
+
 ## Phase 0 findings
 
 - LanguageTool: prebuilt image + bind-mounted `grammar_custom.xml` works; the

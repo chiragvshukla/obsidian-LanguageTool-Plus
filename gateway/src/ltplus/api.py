@@ -16,6 +16,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, Response
 
 from ltplus.config import Settings
+from ltplus.consistency import document_matches
 from ltplus.dictionary import load_words
 from ltplus.lexicon import LexiconTerm, synthetic_matches
 from ltplus.models import Mode
@@ -104,21 +105,21 @@ def _offset(match: object) -> int:
 
 def _allowed_terms(terms: list[LexiconTerm], params: dict[str, str]) -> list[LexiconTerm]:
     """Drop terms the client disabled or did not enable under `enabledOnly`."""
+    return [term for term in terms if _client_allows(term.id.upper(), params)]
+
+
+def _client_allows(rule_id: str, params: dict[str, str]) -> bool:
     disabled_categories = set(_csv(params.get("disabledCategories")))
     disabled_rules = set(_csv(params.get("disabledRules")))
     enabled_categories = set(_csv(params.get("enabledCategories")))
     enabled_rules = set(_csv(params.get("enabledRules")))
     enabled_only = params.get("enabledOnly", "").lower() == "true"
 
-    allowed: list[LexiconTerm] = []
-    for term in terms:
-        rule_id = term.id.upper()
-        if "LT_PLUS" in disabled_categories or rule_id in disabled_rules:
-            continue
-        if enabled_only and "LT_PLUS" not in enabled_categories and rule_id not in enabled_rules:
-            continue
-        allowed.append(term)
-    return allowed
+    if "LT_PLUS" in disabled_categories or rule_id in disabled_rules:
+        return False
+    return not (
+        enabled_only and "LT_PLUS" not in enabled_categories and rule_id not in enabled_rules
+    )
 
 
 def merge_categories(
@@ -267,5 +268,9 @@ async def check(request: Request) -> Response:
     ]
     terms = _allowed_terms(request.app.state.lexicon, params)
     payload["matches"].extend(synthetic_matches(terms, text, language, mode.id))
+    for match in document_matches(terms, text, language, mode.id):
+        rule = match["rule"]
+        if isinstance(rule, dict) and _client_allows(str(rule.get("id", "")), params):
+            payload["matches"].append(match)
     payload["matches"].sort(key=_offset)
     return JSONResponse(payload)

@@ -172,3 +172,39 @@ def test_term_rule_respects_disabled_rules(tmp_path: Path) -> None:
         )
 
     assert response.json()["matches"] == []
+
+
+@respx.mock
+def test_consistency_check_adds_one_document_match(tmp_path: Path) -> None:
+    respx.post(CHECK_URL).mock(return_value=httpx.Response(200, json={"matches": []}))
+
+    with make_client(tmp_path) as client:
+        response = client.post(
+            "/v2/check",
+            data={
+                "data": annotated("Wir danken Ihnen. Kannst du helfen?"),
+                "language": "de-DE",
+                "writing_mode": "neutral",
+            },
+        )
+
+    matches = response.json()["matches"]
+    assert [match["rule"]["id"] for match in matches] == ["CONSISTENCY_DU_SIE"]
+
+
+@respx.mock
+def test_consistency_check_respects_disabled_rules(tmp_path: Path) -> None:
+    respx.post(CHECK_URL).mock(return_value=httpx.Response(200, json={"matches": []}))
+
+    with make_client(tmp_path) as client:
+        response = client.post(
+            "/v2/check",
+            data={
+                "data": annotated("Wir danken Ihnen. Kannst du helfen?"),
+                "language": "de-DE",
+                "writing_mode": "neutral",
+                "disabledRules": "CONSISTENCY_DU_SIE",
+            },
+        )
+
+    assert response.json()["matches"] == []

@@ -49,6 +49,26 @@ terms:
 
 Rules must be written from scratch. Do not copy LanguageTool closed rule text.
 
+## Document consistency
+
+The gateway also reads the whole checked text and adds at most one match per
+issue type. This catches patterns a sentence-level checker cannot see.
+
+| Rule id | What it reports |
+|---|---|
+| `CONSISTENCY_DU_SIE` | German text mixes `Sie` and `du`. |
+| `CONSISTENCY_DATE_FORMAT` | Two date formats (`12.03.2024`, `03/12/2024`, `2024-03-12`) appear in one document. |
+| `CONSISTENCY_NUMBER_FORMAT` | German (`1.234,56`) and English (`1,234.56`) numbers appear together. |
+| term id, e.g. `EMAIL_HYPHEN` | A lexicon term and its `replacement` both appear, placed at the canonical form. |
+
+- Each rule fires once per document, not once per occurrence.
+- `CONSISTENCY_*` rules can be turned off with `disabledRules` or the whole
+  `LT_PLUS` category with `disabledCategories`, exactly like lexicon terms.
+- The address check is a pronoun heuristic: a lone `Sie` is also third-person
+  plural. It only fires when informal forms are present too.
+- The terminology notice reuses the term's id, so disabling the term disables
+  both its per-occurrence matches and its consistency notice.
+
 ## Grammar rules (`rules/grammar_custom.xml`)
 
 The file is bind-mounted into the container at

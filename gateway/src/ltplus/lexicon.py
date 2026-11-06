@@ -81,45 +81,60 @@ def validate_modes(terms: list[LexiconTerm], mode_ids: set[str]) -> None:
                 raise LexiconConfigError(f"term '{term.id}' uses unknown mode '{mode_id}'")
 
 
+def applies(term: LexiconTerm, language: str, mode_id: str) -> bool:
+    """True when the term applies to this language and mode."""
+    primary = language.split("-")[0]
+    if term.modes and mode_id not in term.modes:
+        return False
+    return not (term.languages and language not in term.languages and primary not in term.languages)
+
+
+def make_match(
+    text: str,
+    start: int,
+    end: int,
+    rule_id: str,
+    message: str,
+    replacement: str | None = None,
+) -> dict[str, object]:
+    """Build one LanguageTool-shaped match at a text span."""
+    before = max(0, start - 30)
+    after = min(len(text), end + 30)
+    context = text[before:after]
+    return {
+        "message": message,
+        "shortMessage": "",
+        "replacements": [{"value": replacement}] if replacement else [],
+        "offset": _utf16_len(text[:start]),
+        "length": _utf16_len(text[start:end]),
+        "context": {
+            "text": context,
+            "offset": _utf16_len(text[before:start]),
+            "length": _utf16_len(text[start:end]),
+        },
+        "sentence": context,
+        "type": {"typeName": "Other"},
+        "rule": {
+            "id": rule_id.upper(),
+            "description": message,
+            "issueType": "style",
+            "category": {"id": "LT_PLUS", "name": "LanguageToolPlus"},
+        },
+        "ignoreForIncompleteSentence": False,
+    }
+
+
 def synthetic_matches(
     terms: list[LexiconTerm], text: str, language: str, mode_id: str
 ) -> list[dict[str, object]]:
     """Build LanguageTool-shaped matches for every rule that applies."""
-    primary = language.split("-")[0]
     matches: list[dict[str, object]] = []
     for term in terms:
-        if term.modes and mode_id not in term.modes:
-            continue
-        if term.languages and language not in term.languages and primary not in term.languages:
+        if not applies(term, language, mode_id):
             continue
         for found in term._compiled.finditer(text):
             start, end = found.span()
-            before = max(0, start - 30)
-            after = min(len(text), end + 30)
-            context = text[before:after]
-            matches.append(
-                {
-                    "message": term.message,
-                    "shortMessage": "",
-                    "replacements": [{"value": term.replacement}] if term.replacement else [],
-                    "offset": _utf16_len(text[:start]),
-                    "length": _utf16_len(text[start:end]),
-                    "context": {
-                        "text": context,
-                        "offset": _utf16_len(text[before:start]),
-                        "length": _utf16_len(text[start:end]),
-                    },
-                    "sentence": context,
-                    "type": {"typeName": "Other"},
-                    "rule": {
-                        "id": term.id.upper(),
-                        "description": term.message,
-                        "issueType": "style",
-                        "category": {"id": "LT_PLUS", "name": "LanguageToolPlus"},
-                    },
-                    "ignoreForIncompleteSentence": False,
-                }
-            )
+            matches.append(make_match(text, start, end, term.id, term.message, term.replacement))
     return matches
 
 
