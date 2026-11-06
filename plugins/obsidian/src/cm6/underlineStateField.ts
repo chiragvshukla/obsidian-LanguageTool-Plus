@@ -8,7 +8,7 @@ import {
   ignoreListRegEx
 } from "../helpers";
 import { MatchesEntity } from "../LanguageToolTypings";
-import { isAIUnderline } from "../aiCheck";
+import { AI_RULE_ID, isAIUnderline } from "../aiCheck";
 
 export interface UnderlineEffect {
   from: number;
@@ -217,7 +217,7 @@ export const underlineField = StateField.define<DecorationSet>({
               Decoration.mark({
                 class: `lt-underline ${getIssueTypeClassName(
                   match.rule.category.id
-                )}`,
+                )}${match.rule.id === AI_RULE_ID ? " lt-ai" : ""}`,
                 match
               }).range(from, to)
             ]

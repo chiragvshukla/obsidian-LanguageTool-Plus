@@ -42,13 +42,14 @@ export function changesToMatches(
       continue;
     }
     cursor = offset + length;
+    const isStyle = change.category === "style";
     matches.push({
       message:
         change.explanation ||
         (change.replacement
           ? `${change.original} → ${change.replacement}`
           : `Remove "${change.original}"`),
-      shortMessage: "AI grammar",
+      shortMessage: isStyle ? "AI style" : "AI grammar",
       // An empty replacement is a removal hint: the popover shows the
       // explanation and Ignore, but no button it cannot apply.
       replacements: change.replacement
@@ -61,9 +62,14 @@ export function changesToMatches(
       type: { typeName: "Other" },
       rule: {
         id: AI_RULE_ID,
-        description: "AI grammar suggestion",
-        issueType: "grammar",
-        category: { id: "GRAMMAR", name: "Grammar" }
+        description: isStyle
+          ? "AI style suggestion"
+          : "AI grammar suggestion",
+        issueType: isStyle ? "style" : "grammar",
+        category: {
+          id: isStyle ? "STYLE" : "GRAMMAR",
+          name: isStyle ? "Style" : "Grammar"
+        }
       },
       ignoreForIncompleteSentence: false,
       contextForSureMatch: 0

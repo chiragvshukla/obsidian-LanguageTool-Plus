@@ -27,6 +27,28 @@
   background-color: #8981f321;
 }
 
+/* AI hints keep the category colour but use a dashed line, so they are
+   distinguishable from deterministic LanguageTool underlines. */
+.lt-underline.lt-ai {
+  box-shadow: none;
+  text-decoration-line: underline;
+  text-decoration-style: dashed;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+}
+
+.lt-underline.lt-ai.lt-minor {
+  text-decoration-color: #e9b35f;
+}
+
+.lt-underline.lt-ai.lt-major {
+  text-decoration-color: #da615c;
+}
+
+.lt-underline.lt-ai.lt-style {
+  text-decoration-color: #8981f3;
+}
+
 @keyframes lineInserted {
   from {
     opacity: 0;

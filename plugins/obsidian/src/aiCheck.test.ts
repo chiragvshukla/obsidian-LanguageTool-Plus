@@ -12,11 +12,12 @@ const changes = [
   { original: "Der", replacement: "Das", offset: 0, length: 3, explanation: "sächlich" },
   { original: "geht", replacement: "", offset: source.indexOf("geht"), length: 4 },
   { original: "Das", replacement: "Der", offset: source.indexOf("Das"), length: 3 },
+  { original: "ist", replacement: "sei", offset: source.indexOf("ist"), length: 3, category: "style" },
   { original: "nope", replacement: "x", offset: 0, length: 4 }
 ];
 
 const matches = changesToMatches(100, source, changes);
-equal(matches.length, 3);
+equal(matches.length, 4);
 equal([matches[0].offset, matches[0].length], [100, 3]);
 equal([matches[1].offset, matches[1].length], [100 + source.indexOf("geht"), 4]);
 // A deletion is kept as an explanation-only hint with no replacement button.
@@ -24,6 +25,10 @@ equal(matches[1].replacements, []);
 equal(matches[1].message, 'Remove "geht"');
 equal(matches[2].offset, 100 + source.indexOf("Das"));
 equal(matches[0].rule.id, "AI_GRAMMAR");
+// Correctness and phrasing suggestions carry different categories, which the
+// plugin maps to different underline colours.
+equal([matches[0].rule.category.id, matches[0].shortMessage], ["GRAMMAR", "AI grammar"]);
+equal([matches[3].rule.category.id, matches[3].shortMessage], ["STYLE", "AI style"]);
 
 const withEmoji = "😀 Der Mädchen geht.";
 const emojiMatches = changesToMatches(0, withEmoji, [

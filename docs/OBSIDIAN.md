@@ -61,14 +61,17 @@ are validated by the gateway before the plugin sees them.
   the original, the rewritten text with changed spans highlighted, and one
   short explanation per change. A deletion is shown as a small "removed"
   marker. "Replace" applies the whole rewrite; "Cancel" leaves the note alone.
-- **Check selection with AI** always uses `neutral`, because it is a
-  correctness pass rather than a style rewrite. Each change becomes a normal
+- **Check selection with AI** uses the note's resolved writing mode (frontmatter
+  `lt-mode`, else the plugin setting), so a formal note gets tone-aware phrasing
+  suggestions while `neutral` stays a correctness pass. Each change becomes a
   LanguageTool-shaped underline (`rule.id` = `AI_GRAMMAR`) with the model's
   replacement and explanation, so the existing popover, jump, ignore, and
-  accept-suggestion commands work unchanged. AI spans are drawn even when they
-  overlap deterministic LT underlines; clicking the shared text shows one
-  popover with a section per suggestion, each with its own buttons and Ignore.
-  A deletion has no replacement button, but still shows its explanation.
+  accept-suggestion commands work unchanged. The category picks the colour:
+  `style` is purple and grammar is amber, and AI underlines are dashed while LT
+  underlines stay solid. AI spans are drawn even when they overlap deterministic
+  LT underlines; clicking the shared text shows one popover with a section per
+  suggestion, each with its own buttons and Ignore. A deletion has no
+  replacement button, but still shows its explanation.
 - **Check current paragraph with AI** runs the same pass on the paragraph around
   the cursor, without needing a selection. It reports its result or error in a
   notice and works even when automatic checking is off.

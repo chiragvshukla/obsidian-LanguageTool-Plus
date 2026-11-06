@@ -11,6 +11,7 @@ Regeln:
 - Ändere keine Absatzstruktur, die inhaltlich nötig ist.
 - Ändere nur die betroffenen Stellen, nicht ganze Absätze.
 - Erkläre jede Änderung in einem kurzen Satz.
+- Setze "category" auf "grammar" für Rechtschreibung, Grammatik und Zeichensetzung, sonst auf "style".
 
 Antworte ausschließlich mit JSON in dieser Form:
 {"changes": [{"original": "...", "replacement": "...", "category": "style", "explanation": "kurz"}]}

@@ -28,15 +28,17 @@ unmodified upstream files except where listed below. The upstream `test/` and
      shows the result in a review modal, with changed spans highlighted.
    - `src/aiCheck.ts`: new. Converts validated rewrite changes into
      LanguageTool-shaped matches and finds the paragraph around the cursor.
+     `style` changes get the `STYLE` category (purple), others `GRAMMAR`.
    - `src/index.ts`: added "Rewrite selection with AI", "Check selection with
      AI", and "Check current paragraph with AI". All are hidden unless
-     `enableAIFeatures` is on; the two checks always use `neutral`.
+     `enableAIFeatures` is on; the checks use the note's resolved writing mode.
    - `src/cm6/buildAutoCheckHandler.ts`: optional 10-second paragraph check
      when `aiAutoCheck` is on. Cursor-only updates do not cancel it; the cursor
      is read when the pause ends, and edits invalidate the result.
    - `src/cm6/underlineStateField.ts`: `clearAIUnderlinesInRange` replaces only
      AI underlines; `clearLTUnderlines`/`clearLTUnderlinesInRange` let an LT
-     check clear only its own underlines, so AI hints survive a re-check.
+     check clear only its own underlines, so AI hints survive a re-check. AI
+     decorations also carry `lt-ai`, which draws a dashed underline.
    - `src/cm6/tooltipField.ts`: one popover can now list several overlapping
      suggestions, each with its own replacement buttons and Ignore. A
      non-breaking-rule hint (a deletion) carries its explanation without a

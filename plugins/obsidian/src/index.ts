@@ -464,11 +464,13 @@ export default class LanguageToolPlugin extends Plugin {
       editor.posToOffset(editor.getCursor("to"))
     );
     const language = await this.getRewriteLanguage(text);
+    const file = this.app.workspace.getActiveFile();
+    const mode = getDocumentMode(this.app, file) ?? this.settings.writingMode;
     const { changes } = await requestRewrite(
       this.settings,
       text,
       language,
-      "neutral"
+      mode
     );
 
     const view = editorToCodeMirror(editor);
@@ -542,13 +544,14 @@ export default class LanguageToolPlugin extends Plugin {
       return;
     }
 
+    const mode = getDocumentMode(this.app, file) ?? this.settings.writingMode;
     let changes: RewriteChange[];
     try {
       ({ changes } = await requestRewrite(
         this.settings,
         paragraph.text,
         language,
-        "neutral"
+        mode
       ));
     } catch (e) {
       console.error(e);
