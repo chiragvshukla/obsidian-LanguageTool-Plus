@@ -17,10 +17,11 @@ from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, Response
 from openai import APIConnectionError, APIStatusError, AsyncOpenAI, BadRequestError
 from openai.types.chat import ChatCompletionMessageParam
-from openai.types.shared_params import ResponseFormatJSONObject, ResponseFormatJSONSchema
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
+from ltplus.api import _apply_mode
 from ltplus.config import Settings
+from ltplus.llm import chat_json, llm_status
 from ltplus.models import Mode
 from ltplus.rewrite import PromptError
 
@@ -28,6 +29,10 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 PRACTICE_PROMPTS = ("score", "score-reduce", "topic")
+
+# One LanguageTool request per 30k characters keeps a long note under the
+# default 10s timeout instead of failing the whole score.
+LT_CHUNK_CHARS = 30_000
 
 
 class ScoreGrades(BaseModel):
@@ -157,10 +162,28 @@ def chunk_text(text: str, limit: int) -> list[str]:
     return chunks or [text]
 
 
+def _strip_markdown(text: str) -> str:
+    """Turn note markup into prose so counts reflect what the reader sees."""
+    text = re.sub(r"```.*?```", " ", text, flags=re.DOTALL)
+    text = re.sub(r"`[^`]*`", " ", text)
+    text = re.sub(r"!\[[^\]]*\]\([^)]*\)", " ", text)
+    text = re.sub(r"\[([^\]]*)\]\([^)]*\)", r"\1", text)
+    text = re.sub(r"<[^>]+>", " ", text)
+    text = re.sub(r"(?m)^\s{0,3}(?:#{1,6}|>|[-*+]\s|\d+\.\s)\s*", "", text)
+    text = re.sub(r"[*_~]{1,3}", "", text)
+    return text.strip()
+
+
 def _facts(text: str) -> dict[str, Any]:
-    words = len(re.findall(r"\w+", text))
-    sentences = len([part for part in re.split(r"[.!?]+", text) if part.strip()])
-    sentences = max(1, sentences)
+    words = len(
+        re.findall(r"[^\W\d_]+(?:['’\-][^\W\d_]+)*|\d+(?:[.,]\d+)*", text)  # noqa: RUF001
+    )
+    # Count a terminator only when a new sentence follows, and remove chains
+    # like "z. B." / "i. d. R." first so they do not add sentences.
+    without_abbreviations = re.sub(r"(?:\b[A-Za-z]\.\s*){2,}", " ", text)
+    sentences = (
+        len(re.findall(r"[.!?]+(?=\s+[A-ZÄÖÜ]|\s*$)", without_abbreviations)) or 1
+    )
     return {
         "words": words,
         "sentences": sentences,
@@ -168,67 +191,26 @@ def _facts(text: str) -> dict[str, Any]:
     }
 
 
-async def _lt_issues(lt: httpx.AsyncClient, language: str, text: str) -> list[dict[str, Any]]:
-    response = await lt.post(
-        "/v2/check", data={"text": text, "language": language, "level": "default"}
-    )
-    response.raise_for_status()
-    payload = response.json()
-    matches = payload.get("matches", []) if isinstance(payload, dict) else []
-
+async def _lt_issues(
+    lt: httpx.AsyncClient, language: str, mode: Mode, text: str
+) -> list[dict[str, Any]]:
     counts: dict[str, int] = {}
-    for match in matches:
-        if not isinstance(match, dict):
-            continue
-        category = str(match.get("rule", {}).get("category", {}).get("id", "OTHER"))
-        counts[category] = counts.get(category, 0) + 1
+    for chunk in chunk_text(text, LT_CHUNK_CHARS):
+        params = {"text": chunk, "language": language}
+        _apply_mode(params, mode)
+        response = await lt.post("/v2/check", data=params)
+        response.raise_for_status()
+        payload = response.json()
+        matches = payload.get("matches", []) if isinstance(payload, dict) else []
+        for match in matches:
+            if not isinstance(match, dict):
+                continue
+            category = str(match.get("rule", {}).get("category", {}).get("id", "OTHER"))
+            counts[category] = counts.get(category, 0) + 1
     return [
         {"category": category, "count": count}
         for category, count in sorted(counts.items(), key=lambda item: (-item[1], item[0]))
     ]
-
-
-def _schema(name: str, model: type[BaseModel]) -> ResponseFormatJSONSchema:
-    return {
-        "type": "json_schema",
-        "json_schema": {"name": name, "schema": model.model_json_schema()},
-    }
-
-
-async def _call(
-    client: AsyncOpenAI,
-    settings: Settings,
-    prompt: str,
-    user_message: str,
-    name: str,
-    model: type[BaseModel],
-    temperature: float = 0.2,
-) -> str:
-    messages: list[ChatCompletionMessageParam] = [
-        {
-            "role": "system",
-            "content": prompt + "\n\nReturn only valid JSON. No prose, no code fences.",
-        },
-        {"role": "user", "content": user_message},
-    ]
-    try:
-        response = await client.chat.completions.create(
-            model=settings.llm_model,
-            messages=messages,
-            temperature=temperature,
-            max_tokens=settings.llm_max_tokens,
-            response_format=_schema(name, model),
-        )
-    except BadRequestError:
-        fallback: ResponseFormatJSONObject = {"type": "json_object"}
-        response = await client.chat.completions.create(
-            model=settings.llm_model,
-            messages=messages,
-            temperature=temperature,
-            max_tokens=settings.llm_max_tokens,
-            response_format=fallback,
-        )
-    return response.choices[0].message.content or ""
 
 
 def _score_message(
@@ -321,16 +303,18 @@ async def _llm_error(
     name: str,
     model: type[BaseModel],
 ) -> str | JSONResponse:
+    messages: list[ChatCompletionMessageParam] = [
+        {
+            "role": "system",
+            "content": prompt + "\n\nReturn only valid JSON. No prose, no code fences.",
+        },
+        {"role": "user", "content": user_message},
+    ]
     try:
-        return await _call(client, settings, prompt, user_message, name, model)
-    except BadRequestError as exc:
-        logger.warning("LLM rejected the request: %s", exc.status_code)
-        return _error(502, "llm_invalid_request", "The LLM rejected the request")
-    except APIConnectionError:
-        return _error(503, "llm_unavailable", "The LLM is not reachable")
-    except APIStatusError as exc:
-        logger.warning("LLM status %s", exc.status_code)
-        return _error(502, "llm_error", "The LLM returned an error")
+        return await chat_json(client, settings, messages, name, model, temperature=0.2)
+    except (BadRequestError, APIConnectionError, APIStatusError) as exc:
+        status, code, message = llm_status(exc)
+        return _error(status, code, message)
 
 
 @router.post("/score")
@@ -367,12 +351,16 @@ async def score(request: Request) -> Response:
             f"{settings.llm_score_max_chunks}",
         )
 
+    prose = _strip_markdown(payload.text)
+
     try:
-        issues = await _lt_issues(request.app.state.lt, payload.language, payload.text)
+        issues = await _lt_issues(request.app.state.lt, payload.language, mode, prose)
+    except httpx.TimeoutException:
+        return _error(504, "languagetool_timeout", "LanguageTool did not answer in time")
     except httpx.HTTPError:
         return _error(503, "languagetool_unavailable", "LanguageTool is not reachable")
 
-    facts = _facts(payload.text)
+    facts = _facts(prose)
 
     if len(chunks) == 1:
         content = await _llm_error(

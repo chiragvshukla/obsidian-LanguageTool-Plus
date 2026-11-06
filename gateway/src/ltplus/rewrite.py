@@ -22,11 +22,11 @@ from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, Response
 from openai import APIConnectionError, APIStatusError, AsyncOpenAI, BadRequestError
 from openai.types.chat import ChatCompletionMessageParam
-from openai.types.shared_params import ResponseFormatJSONObject, ResponseFormatJSONSchema
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from ltplus.api import _apply_mode
 from ltplus.config import Settings
+from ltplus.llm import chat_json, llm_status
 from ltplus.models import Mode
 
 logger = logging.getLogger(__name__)
@@ -195,13 +195,6 @@ def _filter_changes(
     return [change for change in changes if change.category in allowed]
 
 
-def _schema() -> ResponseFormatJSONSchema:
-    return {
-        "type": "json_schema",
-        "json_schema": {"name": "rewrite", "schema": LLMOutput.model_json_schema()},
-    }
-
-
 async def _generate(
     client: AsyncOpenAI,
     settings: Settings,
@@ -228,25 +221,7 @@ async def _generate(
         },
     ]
 
-    try:
-        response = await client.chat.completions.create(
-            model=settings.llm_model,
-            messages=messages,
-            temperature=temperature,
-            max_tokens=settings.llm_max_tokens,
-            response_format=_schema(),
-        )
-    except BadRequestError:
-        # Some compatible servers know only json_object (ADR-010).
-        fallback: ResponseFormatJSONObject = {"type": "json_object"}
-        response = await client.chat.completions.create(
-            model=settings.llm_model,
-            messages=messages,
-            temperature=temperature,
-            max_tokens=settings.llm_max_tokens,
-            response_format=fallback,
-        )
-    return response.choices[0].message.content or ""
+    return await chat_json(client, settings, messages, "rewrite", LLMOutput, temperature)
 
 
 def _apply_changes(
@@ -460,14 +435,9 @@ async def rewrite(request: Request) -> Response:
                 payload.context_before,
                 payload.context_after,
             )
-        except BadRequestError as exc:
-            logger.warning("LLM rejected the request: %s", exc.status_code)
-            return _error(502, "llm_invalid_request", "The LLM rejected the request")
-        except APIConnectionError:
-            return _error(503, "llm_unavailable", "The LLM is not reachable")
-        except APIStatusError as exc:
-            logger.warning("LLM status %s", exc.status_code)
-            return _error(502, "llm_error", "The LLM returned an error")
+        except (BadRequestError, APIConnectionError, APIStatusError) as exc:
+            status, code, message = llm_status(exc)
+            return _error(status, code, message)
 
         try:
             parsed = LLMOutput.model_validate(json.loads(content))

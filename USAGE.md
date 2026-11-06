@@ -133,7 +133,7 @@ Create the plugin folder in your vault and copy the three runtime files:
 
 ```powershell
 $vault = "C:\path\to\YourVault"
-$dst = Join-Path $vault ".obsidian\plugins\obsidian-languagetool-plugin"
+$dst = Join-Path $vault ".obsidian\plugins\languagetool-plus"
 New-Item -ItemType Directory -Force $dst | Out-Null
 Copy-Item main.js, manifest.json, styles.css $dst -Force
 ```
@@ -142,9 +142,9 @@ Then in Obsidian:
 
 1. Turn off Restricted Mode under **Settings → Community plugins**.
 2. Reload the app or use the command palette's **Reload app without saving**.
-3. Enable **LanguageTool Integration**.
+3. Enable **LanguageTool Plus**.
 
-Configure the plugin under **Settings → LanguageTool Integration**:
+Configure the plugin under **Settings → LanguageTool Plus**:
 
 - **Endpoint:** custom, `http://127.0.0.1:8077` — the plugin appends `/v2/check`
   itself, so do not add `/v2`.

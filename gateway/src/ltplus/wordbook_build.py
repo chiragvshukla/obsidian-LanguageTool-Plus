@@ -269,6 +269,16 @@ def _build_kaikki(source: Path, directory: Path) -> None:
     os.replace(aliases_tmp, aliases)
 
 
+def _write_sources(directory: Path, sources: dict[str, Any]) -> None:
+    """Replace SOURCES.json in one step so a crash never leaves half of it."""
+    target = directory / "SOURCES.json"
+    temp = target.with_name(target.name + ".tmp")
+    temp.write_text(
+        json.dumps(sources, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
+    os.replace(temp, target)
+
+
 def build_all(
     directory: Path,
     progress: Callable[[str, str], None] | None = None,
@@ -301,6 +311,7 @@ def build_all(
             "license": "GPL-2.0",
         }
         archive.unlink(missing_ok=True)
+        _write_sources(directory, sources)
         report(pair, "installed")
 
     report("de-de", "downloading")
@@ -315,8 +326,5 @@ def build_all(
         "license": "CC-BY-SA-3.0 / GFDL",
     }
     report("de-de", "installed")
-
-    (directory / "SOURCES.json").write_text(
-        json.dumps(sources, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
-    )
+    _write_sources(directory, sources)
     shutil.rmtree(work, ignore_errors=True)

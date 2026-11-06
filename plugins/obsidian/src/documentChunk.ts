@@ -3,6 +3,9 @@ import { frontmatterEnd } from "./dictionaryHelpers";
 /** Largest slice sent to the model by the whole-document check. */
 export const AI_DOC_CHUNK_CHARS = 8000;
 
+/** Largest slice sent to LanguageTool by one whole-document check. */
+export const LT_DOC_CHUNK_CHARS = 30_000;
+
 /** Refuse to fire more calls than this for one explicit document check. */
 export const AI_DOC_MAX_CHUNKS = 20;
 

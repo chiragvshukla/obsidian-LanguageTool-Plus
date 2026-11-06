@@ -76,6 +76,7 @@ export interface LanguageToolPluginSettings {
 
   ruleOtherCategories?: string;
   ruleOtherRules?: string;
+  ruleOtherDisabledCategories?: string;
   ruleOtherDisabledRules?: string;
 
   // AI features are opt-in. Every AI command checks this flag first.
@@ -324,12 +325,19 @@ export class LanguageToolSettingsTab extends PluginSettingTab {
       return;
     }
     this.dictionaryPoll = window.setInterval(() => {
-      void update().then(building => {
-        if (!building && this.dictionaryPoll !== null) {
-          window.clearInterval(this.dictionaryPoll);
-          this.dictionaryPoll = null;
-        }
-      });
+      update()
+        .then(building => {
+          if (!building && this.dictionaryPoll !== null) {
+            window.clearInterval(this.dictionaryPoll);
+            this.dictionaryPoll = null;
+          }
+        })
+        .catch(() => {
+          if (this.dictionaryPoll !== null) {
+            window.clearInterval(this.dictionaryPoll);
+            this.dictionaryPoll = null;
+          }
+        });
     }, 2000);
   }
 
@@ -998,11 +1006,13 @@ export class LanguageToolSettingsTab extends PluginSettingTab {
                 }
               });
             });
-            void update().then(building => {
-              if (building) {
-                this.ensureDictionaryPoll(update);
-              }
-            });
+            void update()
+              .then(building => {
+                if (building) {
+                  this.ensureDictionaryPoll(update);
+                }
+              })
+              .catch(() => undefined);
           }
         }
       ]
@@ -1058,6 +1068,23 @@ export class LanguageToolSettingsTab extends PluginSettingTab {
                     /\s+/g,
                     ""
                   );
+                  await this.plugin.saveSettings();
+                })
+            );
+            appendRuleListLink(setting);
+          }
+        },
+        {
+          name: "Disable Specific Categories",
+          desc: "Enter a comma-separated list of categories",
+          render: setting => {
+            setting.addText(text =>
+              text
+                .setPlaceholder("Eg. CATEGORY_1,CATEGORY_2")
+                .setValue(this.plugin.settings.ruleOtherDisabledCategories ?? "")
+                .onChange(async value => {
+                  this.plugin.settings.ruleOtherDisabledCategories =
+                    value.replace(/\s+/g, "");
                   await this.plugin.saveSettings();
                 })
             );

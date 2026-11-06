@@ -55,26 +55,28 @@ class Wordbook:
         self._error = ""
 
     def status(self) -> dict[str, Any]:
-        pairs = {}
-        for pair in PAIRS:
-            path = _entries_path(self.directory, pair)
-            pairs[pair] = {
-                "installed": path.is_file(),
-                "bytes": path.stat().st_size if path.is_file() else 0,
+        with self._lock:
+            pairs = {}
+            for pair in PAIRS:
+                path = _entries_path(self.directory, pair)
+                pairs[pair] = {
+                    "installed": path.is_file(),
+                    "bytes": path.stat().st_size if path.is_file() else 0,
+                }
+            return {
+                "pairs": pairs,
+                "building": self._building,
+                "message": self._message,
+                "error": self._error,
             }
-        return {
-            "pairs": pairs,
-            "building": self._building,
-            "message": self._message,
-            "error": self._error,
-        }
 
     def start_install(self) -> None:
-        if self._building:
-            return
-        self._building = True
-        self._error = ""
-        self._message = "starting"
+        with self._lock:
+            if self._building:
+                return
+            self._building = True
+            self._error = ""
+            self._message = "starting"
         threading.Thread(target=self._install, name="wordbook-install", daemon=True).start()
 
     def _install(self) -> None:
@@ -84,15 +86,19 @@ class Wordbook:
             build_all(self.directory, self._progress)
         except Exception as exc:  # surfaced through /dictionary/status
             logger.warning("wordbook install failed: %s", exc)
-            self._error = str(exc)
-            self._message = "failed"
+            with self._lock:
+                self._error = str(exc)
+                self._message = "failed"
         else:
-            self._message = "installed"
+            with self._lock:
+                self._message = "installed"
+        finally:
+            # A failed build may still have replaced some pairs, so always
+            # drop cached indexes rather than serve stale entries.
             with self._lock:
                 self._index.clear()
                 self._aliases = None
-        finally:
-            self._building = False
+                self._building = False
 
     def _progress(self, pair: str, message: str) -> None:
         self._message = f"{pair}: {message}"

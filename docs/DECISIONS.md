@@ -369,9 +369,11 @@ the sections interact.
 ends, then a hard slice, so every section fits the budget. The plugin does this
 for whole-document checks (`documentChunk.ts`) because it needs progress and
 local offsets. The gateway does the same for `/score` (`chunk_text`) because
-the report is aggregated there. `/score` computes facts and LanguageTool
-findings once over the whole text, then grades each section and makes one
-reduce call that receives the facts and the section results. Notes within the
+the report is aggregated there. `/score` strips Markdown, then computes facts
+and LanguageTool findings over the prose in 30,000-character sections with the
+selected mode's parameters, grades each model section, and makes one reduce
+call that receives the facts and the section results. A LanguageTool timeout
+returns `504 languagetool_timeout` instead of pretending the service is down. Notes within the
 budget keep the single-call path. Scoring is capped at
 `LLM_SCORE_MAX_CHUNKS` (default 8); whole-document checking at 20 sections.
 Rewriting remains selection-only.
@@ -399,14 +401,35 @@ three recommendations. There is no overall score and no grammar grade, because
 grammar is already measured exactly. The plugin renders both parts in one
 read-only modal and labels the grades as model judgement. Requests are explicit
 commands; they never create underlines, are never automatic, and are not cached.
-No second LanguageTool call is made: the same `/v2/check` input that
-`Check Text` uses feeds the facts.
+No second LanguageTool request is needed for the model: the same `/v2/check`
+input that `Check Text` uses feeds the facts, split into 30,000-character
+sections so a long note still fits the LanguageTool timeout.
 
 **Consequences:** the report is less tidy than a single number but cannot
 contradict the deterministic findings. If the model proves too noisy, the
 grades can be dropped without changing the endpoint shape. While the modal is
 open, automatic LT and AI checks are suppressed so the note does not change
 underneath the report; manual commands still work.
+
+## ADR-022 — The vendored plugin has its own id and version
+
+**Status:** accepted
+
+**Context:** the fork kept upstream's plugin id
+(`obsidian-languagetool-plugin`) and manifest version, so installing it
+alongside the community plugin replaced one with the other, and Obsidian could
+serve stale files from the shared folder. The manifest also disagreed with
+`package.json` (`0.4.3` vs `0.9.7`).
+
+**Decision:** the plugin id is `languagetool-plus` and the name is
+"LanguageTool Plus". The manifest, `package.json`, and `versions.json` all use
+version `0.9.7`, the fork's own version. Upstream URLs stay in provenance and
+credit files; only the installed folder and in-app name change.
+
+**Consequences:** existing vault installs must copy the build into
+`.obsidian/plugins/languagetool-plus/` and enable the renamed plugin. Settings
+move with the old folder, so the old plugin folder can be removed after the new
+one starts.
 
 ## Phase 0 findings
 

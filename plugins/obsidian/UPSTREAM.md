@@ -90,7 +90,7 @@ yarn build            # or: npm run build
 `main.js` is a build artifact and is ignored by git. It bundles 40
 MIT-licensed npm packages; their notices are in the repository-root
 `THIRD_PARTY_NOTICES.md`. Copy `main.js`, `manifest.json`, and `styles.css` into
-`<vault>/.obsidian/plugins/obsidian-languagetool-plugin/` and keep the notices
+`<vault>/.obsidian/plugins/languagetool-plus/` and keep the notices
 with any build you share.
 
 ## Upstream updates

@@ -1,4 +1,4 @@
-# LanguageTool Integration
+# LanguageTool Plus
 
 Check grammar and spelling with [LanguageTool](https://languagetool.org/) without leaving [Obsidian](https://obsidian.md). Run a check on the whole document or just the selected text, or let the plugin check automatically as you type. Mistakes are underlined in the editor; click one to review suggestions, apply a correction, or add the word to your personal dictionary.
 
@@ -10,16 +10,16 @@ The plugin works with the free public LanguageTool API, with [LanguageTool](#hos
 
 ## Installation
 
-1. In Obsidian, open Settings, then Community plugins, and turn off "Restricted mode" (read the safety warning).
-2. Click Browse, search for "LanguageTool Integration", and click Install.
-3. Click Enable.
+This is the local LanguageTool Plus fork; it is not published to the community
+plugin browser under its upstream name. Build it and copy the files as
+described in [`UPSTREAM.md`](UPSTREAM.md):
 
-<details>
-<summary>Manual installation</summary>
-
-Copy `main.js`, `styles.css`, and `manifest.json` from the [latest release](https://github.com/Clemens-E/obsidian-languagetool-plugin/releases/latest) into `VaultFolder/.obsidian/plugins/obsidian-languagetool-plugin/`. Release assets are signed with [GitHub artifact attestations](https://docs.github.com/en/actions/security-for-github-actions/using-artifact-attestations/using-artifact-attestations-to-establish-provenance-for-builds); you can verify them with `gh attestation verify main.js -R Clemens-E/obsidian-languagetool-plugin`.
-
-</details>
+```powershell
+npm install
+npm run build
+# copy main.js, styles.css, and manifest.json into:
+# VaultFolder/.obsidian/plugins/languagetool-plus/
+```
 
 ## Usage
 
@@ -150,7 +150,7 @@ On Obsidian 1.11.4 and newer, the plugin can keep your API key in Obsidian's enc
 
 **Upsides of secure storage**
 
-- The key is stored encrypted by Obsidian instead of as plaintext in `.obsidian/plugins/obsidian-languagetool-plugin/data.json`, so vault backups, Git-synced vaults, and sync services never see it.
+- The key is stored encrypted by Obsidian instead of as plaintext in `.obsidian/plugins/languagetool-plus/data.json`, so vault backups, Git-synced vaults, and sync services never see it.
 - The synced settings only contain the *name* of the secret, never the key itself.
 - Secrets can be shared across plugins: several plugins can reference the same secret, so a rotated key only needs to be updated in one place.
 

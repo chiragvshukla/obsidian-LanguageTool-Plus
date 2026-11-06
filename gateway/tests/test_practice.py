@@ -3,6 +3,7 @@ from collections.abc import Iterator
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
+from urllib.parse import parse_qs
 
 import httpx
 import pytest
@@ -12,7 +13,13 @@ from openai import APIConnectionError
 
 from ltplus.config import Settings
 from ltplus.main import create_app
-from ltplus.practice import PromptError, chunk_text, load_practice_prompts
+from ltplus.practice import (
+    PromptError,
+    _facts,
+    _strip_markdown,
+    chunk_text,
+    load_practice_prompts,
+)
 
 MODES_DIR = Path(__file__).resolve().parents[2] / "modes"
 PROMPTS_DIR = Path(__file__).resolve().parents[2] / "prompts"
@@ -239,3 +246,80 @@ def test_missing_practice_prompt_fails_loudly(tmp_path: Path) -> None:
 
     with pytest.raises(PromptError):
         load_practice_prompts(tmp_path)
+
+
+@respx.mock
+def test_score_applies_writing_mode_to_language_tool(
+    client: TestClient, llm: FakeLLM
+) -> None:
+    route = respx.post(CHECK_URL).mock(
+        return_value=httpx.Response(200, json={"matches": []})
+    )
+
+    response = client.post(
+        "/score", json={"text": "Ein Text.", "language": "de-DE", "mode": "academic"}
+    )
+
+    assert response.status_code == 200
+    params = parse_qs(route.calls.last.request.content.decode())
+    assert params["level"] == ["picky"]
+    assert "STYLE" in params["enabledCategories"][0]
+    assert "COLLOQUIALISMS" in params["disabledCategories"][0]
+
+    route.reset()
+    response = client.post(
+        "/score", json={"text": "Ein Text.", "language": "de-DE", "mode": "neutral"}
+    )
+
+    assert response.status_code == 200
+    params = parse_qs(route.calls.last.request.content.decode())
+    assert params["level"] == ["default"]
+    assert "STYLE" in params["disabledCategories"][0]
+
+
+@respx.mock
+def test_score_chunks_long_text_for_language_tool(
+    client: TestClient, llm: FakeLLM
+) -> None:
+    text = "Ein Satz. " * 5000
+    chunks = chunk_text(text, 12000)
+    section = {
+        "grades": {"clarity": 1, "tone": 1, "vocabulary": 1, "structure": 1},
+        "recommendations": [],
+    }
+    llm.replies = [json.dumps(section)] * len(chunks) + [json.dumps(SCORE)]
+    route = respx.post(CHECK_URL).mock(
+        return_value=httpx.Response(200, json={"matches": []})
+    )
+
+    response = client.post("/score", json={"text": text, "language": "de-DE"})
+
+    assert response.status_code == 200
+    assert route.call_count == 2
+    assert all(
+        len(parse_qs(call.request.content.decode())["text"][0]) <= 30_000
+        for call in route.calls
+    )
+
+
+@respx.mock
+def test_score_reports_languagetool_timeout(client: TestClient) -> None:
+    respx.post(CHECK_URL).mock(side_effect=httpx.ReadTimeout("slow"))
+
+    response = client.post("/score", json={"text": "Ein Text."})
+
+    assert response.status_code == 504
+    assert response.json()["error"]["code"] == "languagetool_timeout"
+
+
+def test_facts_ignore_markup_and_abbreviations() -> None:
+    text = "## Titel\n\nDas ist z. B. ein Test. Noch ein Satz."
+
+    prose = _strip_markdown(text)
+
+    assert "##" not in prose
+    assert _facts(prose) == {
+        "words": 10,
+        "sentences": 2,
+        "averageSentenceWords": 5.0,
+    }

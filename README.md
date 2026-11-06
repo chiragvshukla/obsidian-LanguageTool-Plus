@@ -17,10 +17,11 @@ features" switch (off by default), a rewrite command, and a selection-scoped AI
 check that reuses the existing underlines. The upstream plugin also works
 against the gateway in pass-through mode.
 
-> **Status:** Phase 3 plus the plugin fork's AI rewrite and AI check. The
-> gateway proxies `/v2/check` and `/v2/languages`, applies writing modes, and
-> serves `POST /rewrite`. Whole-document inline AI suggestions remain deferred;
-> see `docs/PLAN.md`.
+> **Status:** Phase 9 complete. The gateway proxies `/v2/check` and
+> `/v2/languages`, applies writing modes, and serves `/rewrite`, `/score`,
+> `/topic`, and `/dictionary/*`. The plugin supports selection rewrites,
+> whole-document AI checks, long-note scoring, and the hover dictionary. See
+> `docs/PLAN.md` for the phase history.
 
 > **Built with AI (open-weight models).** This is a personal project, developed
 > largely with AI coding assistants running open-weight models. Changes are
@@ -75,8 +76,9 @@ Invoke-RestMethod http://127.0.0.1:8077/rewrite `
   -Body '{"text":"Das ist ein Tset.","language":"de-DE","mode":"formal"}'
 ```
 
-In Obsidian, install the plugin from `plugins/obsidian/` (see
-`plugins/obsidian/UPSTREAM.md` for the build) and set its endpoint to
+In Obsidian, install the plugin from `plugins/obsidian/` into
+`.obsidian/plugins/languagetool-plus/` (see `plugins/obsidian/UPSTREAM.md` for
+the build) and set its endpoint to
 `http://127.0.0.1:8077` (the plugin appends `/v2` itself). Port `8010` is
 LanguageTool directly and does not apply writing modes. Enable "AI features"
 in the plugin settings to unlock "Rewrite selection with AI" and "Check

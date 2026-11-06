@@ -1,4 +1,5 @@
 import { App, Modal, requestUrl, Setting } from "obsidian";
+import { droppedChangesNotice } from "./rewriteGuard";
 import { LanguageToolPluginSettings } from "./SettingsTab";
 
 interface RewriteErrorBody {
@@ -17,11 +18,13 @@ export interface RewriteChange {
 interface RewriteResponseBody {
   rewritten: string;
   changes?: RewriteChange[];
+  dropped?: number;
 }
 
 export interface RewriteResult {
   rewritten: string;
   changes: RewriteChange[];
+  dropped: number;
 }
 
 /**
@@ -76,7 +79,11 @@ export async function requestRewrite(
   }
 
   const payload = res.json as RewriteResponseBody;
-  return { rewritten: payload.rewritten, changes: payload.changes ?? [] };
+  return {
+    rewritten: payload.rewritten,
+    changes: payload.changes ?? [],
+    dropped: payload.dropped ?? 0
+  };
 }
 
 /** Show the original and the rewrite side by side before replacing. */
@@ -86,7 +93,8 @@ export class RewriteModal extends Modal {
     private readonly original: string,
     private readonly rewritten: string,
     private readonly changes: RewriteChange[],
-    private readonly onReplace: (value: string) => void
+    private readonly dropped: number,
+    private readonly onReplace: (value: string) => boolean
   ) {
     super(app);
   }
@@ -98,6 +106,11 @@ export class RewriteModal extends Modal {
     contentEl.createEl("pre", { text: this.original });
     contentEl.createEl("h3", { text: "Rewritten" });
     this.renderRewritten(contentEl);
+
+    const dropped = droppedChangesNotice(this.dropped);
+    if (dropped) {
+      contentEl.createEl("p", { text: dropped });
+    }
 
     if (this.changes.length > 0) {
       contentEl.createEl("h3", { text: "Changes" });
@@ -117,8 +130,9 @@ export class RewriteModal extends Modal {
           .setButtonText("Replace")
           .setCta()
           .onClick(() => {
-            this.onReplace(this.rewritten);
-            this.close();
+            if (this.onReplace(this.rewritten)) {
+              this.close();
+            }
           })
       )
       .addButton(button =>

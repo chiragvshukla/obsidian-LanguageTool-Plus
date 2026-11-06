@@ -47,10 +47,11 @@ import {
 } from "./cm6/underlineStateField";
 import { addWordToDictionaryWithUndo } from "./cm6/dictionaryAction";
 import { requestRewrite, RewriteChange, RewriteModal } from "./rewrite";
+import { selectionUnchanged } from "./rewriteGuard";
 import { ScoreModal, requestScore, requestTopic } from "./practice";
 import { formatTopic } from "./practiceHelpers";
 import { AI_AUTO_MAX_CHARS, changesToMatches, contextAround, paragraphAt, sentenceAt } from "./aiCheck";
-import { AI_DOC_MAX_CHUNKS, chunkDocument } from "./documentChunk";
+import { AI_DOC_MAX_CHUNKS, chunkDocument, LT_DOC_CHUNK_CHARS } from "./documentChunk";
 import { frontmatterEnd } from "./dictionaryHelpers";
 import { DictionaryPairModal, WritingModeModal } from "./modePicker";
 
@@ -508,7 +509,7 @@ export default class LanguageToolPlugin extends Plugin {
     const file = this.app.workspace.getActiveFile();
     const mode = getDocumentMode(this.app, file) ?? this.settings.writingMode;
     const language = await this.getRewriteLanguage(text);
-    const { rewritten, changes } = await requestRewrite(
+    const { rewritten, changes, dropped } = await requestRewrite(
       this.settings,
       text,
       language,
@@ -521,8 +522,13 @@ export default class LanguageToolPlugin extends Plugin {
       return;
     }
 
-    new RewriteModal(this.app, text, rewritten, changes, value => {
+    new RewriteModal(this.app, text, rewritten, changes, dropped, value => {
+      if (!selectionUnchanged(editor.getSelection(), text)) {
+        new Notice("AI rewrite discarded: the selection changed");
+        return false;
+      }
       editor.replaceSelection(value);
+      return true;
     }).open();
   }
 
@@ -1271,12 +1277,34 @@ export default class LanguageToolPlugin extends Plugin {
       res = this.hashLru.get(hash)!;
     } else {
       try {
-        res = await getDetectionResult(
-          text,
-          () => this.settings,
-          this.getCredentials(),
-          { language: documentLanguage, mode: documentMode }
-        );
+        // One long note can exceed LanguageTool's timeout. Check it in
+        // sections and shift each section's matches back to document offsets.
+        const parts =
+          text.length > LT_DOC_CHUNK_CHARS
+            ? chunkDocument(text, LT_DOC_CHUNK_CHARS, false)
+            : [];
+        const sections =
+          parts.length > 0 ? parts : [{ from: 0, to: text.length, text }];
+        const responses: LanguageToolApi[] = [];
+        for (const section of sections) {
+          responses.push(
+            await getDetectionResult(
+              section.text,
+              () => this.settings,
+              this.getCredentials(),
+              { language: documentLanguage, mode: documentMode }
+            )
+          );
+        }
+        res = responses[0];
+        if (sections.length > 1) {
+          res.matches = responses.flatMap((part, index) =>
+            (part.matches ?? []).map(match => ({
+              ...match,
+              offset: match.offset + sections[index].from
+            }))
+          );
+        }
         this.hashLru.set(hash, res);
       } catch (e) {
         this.setStatusBarReady();

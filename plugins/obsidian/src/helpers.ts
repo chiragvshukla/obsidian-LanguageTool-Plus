@@ -208,8 +208,8 @@ export function getRuleCategories(settings: LanguageToolPluginSettings) {
   const enabledCategories: string[] = settings.ruleOtherCategories
     ? settings.ruleOtherCategories.split(",")
     : [];
-  const disabledCategories: string[] = settings.ruleOtherDisabledRules
-    ? settings.ruleOtherDisabledRules.split(",")
+  const disabledCategories: string[] = settings.ruleOtherDisabledCategories
+    ? settings.ruleOtherDisabledCategories.split(",")
     : [];
 
   return {
