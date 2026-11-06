@@ -1,144 +1,157 @@
 # LanguageToolPlus
 
-A personal, self-hosted German/English writing assistant for Obsidian.
+A self-hosted German/English writing assistant for Obsidian. It runs a local
+gateway in front of [LanguageTool](https://github.com/languagetool-org/languagetool)
+and, if you want, an OpenAI-compatible LLM for rewriting and style advice.
 
-It combines three open parts:
+No account, no telemetry, no database. One person, one vault, one machine.
 
-- [LanguageTool](https://github.com/languagetool-org/languagetool) (LGPL-2.1)
-  as the deterministic grammar, spelling, and style engine.
-- A small FastAPI **gateway** that is API-compatible with LanguageTool's
-  `/v2/check`, adds writing modes, a personal dictionary, style-guide rules,
-  rewrites, and document-level consistency checks.
-- An OpenAI-compatible **LLM** for style and fluency work. Ollama is the local
-  default; any compatible endpoint works.
+## What it does
 
-The Obsidian plugin is vendored under `plugins/obsidian/` with an "Enable AI
-features" switch (off by default), a rewrite command, and a selection-scoped AI
-check that reuses the existing underlines. The upstream plugin also works
-against the gateway in pass-through mode.
+- Check a note or a selection for grammar, spelling, and style.
+- Pick a writing mode: `neutral`, `formal`, `casual`, `academic`, or `business`.
+  A note can override it with `lt-mode` frontmatter.
+- Rewrite a selection and review the changed spans before applying them.
+- Check a selection, the current paragraph, or the whole document with an LLM.
+- Score a note: exact LanguageTool counts plus 1–5 grades and up to three
+  recommendations.
+- Insert a writing topic as a blockquote, for practice.
+- Hover any word for a local German/English dictionary entry.
 
-What you can do in Obsidian:
+AI features are off by default. Everything except the AI commands works with
+LanguageTool alone.
 
-- Check the note or selection with LanguageTool; underlines and the popover
-  work as before, with writing modes applied on the gateway.
-- Rewrite a selection, review changed spans, then replace or cancel.
-- Check a selection, the paragraph around the cursor, or the whole document
-  with AI, with hints drawn as normal (dashed) underlines.
-- Let the optional auto-check follow the cursor: after 4 seconds it checks the
-  sentence you are on, including an older sentence you clicked into.
-- Score a note (exact counts plus 1–5 grades and up to three recommendations)
-  or insert a writing topic as a blockquote.
-- Hover a word for a local dictionary entry, independent of the AI switch.
+## How it works
 
-See [`USAGE.md`](USAGE.md) for the full walkthrough.
+```
+Obsidian plugin  ->  gateway (127.0.0.1:8077)  ->  LanguageTool (127.0.0.1:8010)
+                                             \->  optional LLM (Ollama or hosted)
+```
 
-> **Built with AI (open-weight models).** This is a personal project, developed
-> largely with AI coding assistants running open-weight models. Changes are
-> reviewed and tested before use, but expect rough edges and verify anything
-> you depend on.
->
-> **AI features.** Rewrites, AI checks, and the optional paragraph auto-check
-> send text to the OpenAI-compatible endpoint you configure in the plugin
-> settings, together with the model and (optionally) an API key stored in
-> Obsidian's SecretStorage. The plugin's "Enable AI features" switch is off by
-> default, and no AI request is made while it is off or while no endpoint and
-> model are configured. LanguageTool checks are unaffected. If you point the
-> plugin at a hosted API, that provider's terms and privacy policy apply.
-
-> [!WARNING]
-> **AI features are slow and hardware-dependent.** A local model can take
-> seconds to tens of seconds per rewrite or AI check, versus milliseconds for a
-> LanguageTool check. Speed depends on your CPU, GPU, and available memory; the
-> first request is slower while the model loads. Start with a small model.
+The gateway speaks LanguageTool's `/v2/check` and `/v2/languages`, so the
+upstream plugin works against it unchanged. It adds writing modes, a personal
+dictionary, style rules, and the `/rewrite`, `/score`, `/topic`, and
+`/dictionary` endpoints. Only LanguageTool runs in a container; the gateway and
+the LLM are ordinary host processes reached by URL.
 
 ## Requirements
 
-- Docker Desktop (or Docker Engine + Compose) for LanguageTool. On Windows,
-  use Docker Desktop with the WSL2 backend (`wsl --install` if WSL2 is missing);
-  the Linux container image cannot run on WSL1.
-- [uv](https://docs.astral.sh/uv/) for the gateway
-- Obsidian
-- *Optional:* an OpenAI-compatible LLM endpoint for `POST /rewrite`. Ollama is
-  the local default but is not part of this repository: it runs natively and is
-  addressed by URL. Without it, checking still works and `/rewrite` returns
-  `503 llm_unavailable`.
+- Docker Desktop (or Docker Engine + Compose). On Windows, use the WSL2 backend
+  (`wsl --install` if WSL2 is missing); the image is Linux-only and does not run
+  on WSL1.
+- [uv](https://docs.astral.sh/uv/) and Python 3.12 (uv installs the interpreter).
+- Node.js 18+ and npm, to build the plugin.
+- Obsidian desktop 1.8.10 or newer.
+- *Optional:* an OpenAI-compatible LLM endpoint. Ollama is the local default but
+  is not part of this repository. Without one, checking still works and
+  `/rewrite` returns `503 llm_unavailable`.
 
-## Quick start
+## Install
 
-For the full install, plugin build, update, and troubleshooting walkthrough,
-see [`USAGE.md`](USAGE.md).
+Run these from the repository root. PowerShell is shown; any shell works.
 
-```powershell
-Copy-Item .env.example .env
-# edit .env if needed; never commit it
+1. **Configure.**
 
-# LanguageTool (the only container)
-docker compose up -d languagetool
+   ```powershell
+   Copy-Item .env.example .env    # defaults fit a local install
+   ```
 
-# Gateway, natively
-cd gateway
-uv sync
-uv run uvicorn ltplus.main:app --host 127.0.0.1 --port 8077
+2. **Start LanguageTool.** It is the only container.
 
-Invoke-RestMethod http://127.0.0.1:8077/healthz
-```
+   ```powershell
+   docker compose up -d languagetool
+   ```
 
-Ollama is expected to be running already, at the URL in `LLM_BASE_URL`
-(`http://127.0.0.1:11434/v1` by default). It is only used by `POST /rewrite`.
-Any compatible server works; the gateway knows nothing about which one.
+3. **Start the gateway.** Leave it running; use a second terminal for the rest.
 
-Try a rewrite:
+   ```powershell
+   cd gateway
+   uv sync
+   uv run uvicorn ltplus.main:app --host 127.0.0.1 --port 8077
+   Invoke-RestMethod http://127.0.0.1:8077/healthz
+   ```
 
-```powershell
-Invoke-RestMethod http://127.0.0.1:8077/rewrite `
-  -Method Post -ContentType "application/json" `
-  -Body '{"text":"Das ist ein Tset.","language":"de-DE","mode":"formal"}'
-```
+4. **Build and install the plugin.** From the repository root:
 
-In Obsidian, install the plugin from `plugins/obsidian/` into
-`.obsidian/plugins/languagetool-plus/` (see `plugins/obsidian/UPSTREAM.md` for
-the build) and set its endpoint to
-`http://127.0.0.1:8077` (the plugin appends `/v2` itself). Port `8010` is
-LanguageTool directly and does not apply writing modes. Enable "AI features"
-in the plugin settings to unlock "Rewrite selection with AI" and "Check
-selection with AI"; the latter shows model changes as inline suggestions. An
-optional "AI auto-check current sentence" setting checks after a 4-second pause
-without typing or moving the cursor. The "Writing mode" setting applies to
-checks and rewrites; a note can override it with `lt-mode` frontmatter.
+   ```powershell
+   cd plugins/obsidian
+   npm install
+   npm run build
+   ```
 
-For plugin development, `cd plugins/obsidian; npm install; npm run dev` watches
-and rebuilds `main.js`. `npm run build` type-checks, `npm run test:ai` runs the
-pure unit tests (also run in CI), and `npm run lint` checks the source.
+   Copy `main.js`, `manifest.json`, and `styles.css` into
+   `<vault>/.obsidian/plugins/languagetool-plus/`, then enable
+   **LanguageTool Plus** in Obsidian's community plugins.
+
+5. **Point the plugin at the gateway.** In the plugin settings choose a custom
+   endpoint and enter `http://127.0.0.1:8077` — the plugin appends `/v2`
+   itself, so do not add it. Port `8010` is LanguageTool directly and does not
+   apply writing modes.
+
+The full walkthrough — update procedure, troubleshooting, uninstall — is in
+[`USAGE.md`](USAGE.md).
+
+## Optional AI
+
+Set an endpoint and model under *Settings → LanguageTool Plus → AI features*.
+Ollama works at `http://127.0.0.1:11434/v1`; any OpenAI-compatible server works
+too. The API key, if you need one, is stored in Obsidian's SecretStorage. With
+no endpoint configured, AI stays off.
+
+See [`docs/LLM.md`](docs/LLM.md) for the request contract and validation.
+
+## Privacy and limits
+
+Your text goes to the LanguageTool instance and, only when you use an AI
+command, to the LLM endpoint you configured. Nothing else is sent. Hosted
+providers apply their own terms and privacy policy.
+
+AI is slow and hardware-dependent: the LanguageTool check takes milliseconds, a
+local model takes seconds to tens of seconds, and the first request is slower
+while it loads. Start with a small model.
+
+This is a personal project, developed largely with AI coding assistants running
+open-weight models. Changes are reviewed and tested before use, but expect rough
+edges and verify anything you depend on.
 
 ## Configuration
 
-All runtime configuration is environment-based. See `.env.example`. There are
-no committed secrets. The gateway never logs document text by default.
+Runtime configuration is environment-based; see `.env.example`. There are no
+committed secrets, and the gateway does not log document text by default. See
+[`docs/SECURITY.md`](docs/SECURITY.md) for the threat model.
 
-Only LanguageTool is containerized. The gateway and the LLM are plain host
-processes addressed by `LT_URL` and `LLM_BASE_URL`.
+## Development
 
-## Repository layout
+```powershell
+# Gateway: lint, types, and tests
+cd gateway
+uv run pytest                 # or: pwsh ../scripts/check.ps1 for the full check
 
-See `AGENTS.md` §5 and `docs/ARCHITECTURE.md`.
+# Plugin
+cd ../plugins/obsidian
+npm run dev                   # rebuild main.js on change
+npm run test:ai               # pure unit tests, also run in CI
+npm run lint
+```
+
+CI runs the same checks on every push. See
+[`docs/TESTING.md`](docs/TESTING.md) for the test layers.
 
 ## Documentation
 
 - [`USAGE.md`](USAGE.md) — install, run, build, update, troubleshoot
-- `docs/ARCHITECTURE.md` — components and request flow
-- `docs/OPERATIONS.md` — health checks, restart, backup, restore
-- `docs/RULES.md` — add dictionary words, term rules, and German grammar rules
-- `docs/STANDARDS.md` — engineering standards
-- `docs/SECURITY.md` — secrets, privacy, threat model
-- `docs/LICENSING.md` — AGPL/LGPL obligations
-- `docs/PROVENANCE.md` — what was borrowed and from where
-- `docs/DECISIONS.md` — architecture decision records
-- `docs/LLM.md` — OpenAI-compatible contract and validation
-- `docs/TESTING.md` — test strategy
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — components and request flow
+- [`docs/OPERATIONS.md`](docs/OPERATIONS.md) — health checks, restart, backup, restore
+- [`docs/RULES.md`](docs/RULES.md) — dictionary words, term rules, German grammar rules
+- [`docs/SECURITY.md`](docs/SECURITY.md) — secrets, privacy, threat model
+- [`docs/LICENSING.md`](docs/LICENSING.md) — AGPL/LGPL obligations
+- [`docs/PROVENANCE.md`](docs/PROVENANCE.md) — what was borrowed and from where
+- [`docs/DECISIONS.md`](docs/DECISIONS.md) — architecture decision records
+- [`docs/LLM.md`](docs/LLM.md) — OpenAI-compatible contract and validation
+- [`docs/STANDARDS.md`](docs/STANDARDS.md) — engineering standards
+- [`docs/TESTING.md`](docs/TESTING.md) — test strategy
 
 ## Credits
-
-Built on other people's work:
 
 - **LanguageTool** and its German rules, by the LanguageTool team
   (LGPL-2.1-or-later).
@@ -156,4 +169,4 @@ Full attribution, copyright notices, and license texts are in
 AGPL-3.0-or-later. See `LICENSE`.
 
 LanguageTool is used unmodified as a separate service under LGPL-2.1. The
-Obsidian plugin fork remains AGPL-3.0. See `docs/LICENSING.md`.
+Obsidian plugin fork remains AGPL-3.0. See [`docs/LICENSING.md`](docs/LICENSING.md).
