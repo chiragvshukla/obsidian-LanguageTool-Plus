@@ -1,6 +1,6 @@
 import { App, Editor, TFile, Vault } from "obsidian";
 import { EditorView } from "@codemirror/view";
-import { LanguageToolPluginSettings } from "./SettingsTab";
+import { LanguageToolPluginSettings, isWritingMode, WritingMode } from "./SettingsTab";
 import { MatchesEntity } from "./LanguageToolTypings";
 
 // Obsidian's Editor wraps a CodeMirror 6 view. The instance is not part of
@@ -85,6 +85,20 @@ export function getDocumentLanguage(
     }
   }
   return undefined;
+}
+
+// A note can pin a writing mode. Unknown values are ignored so the global
+// setting applies; the gateway rejects unknown modes with a 400.
+export function getDocumentMode(
+  app: App,
+  file: TFile | null
+): WritingMode | undefined {
+  if (!file) {
+    return undefined;
+  }
+  const value: unknown =
+    app.metadataCache.getFileCache(file)?.frontmatter?.["lt-mode"];
+  return isWritingMode(value) ? value : undefined;
 }
 
 export const ignoreListRegEx = /frontmatter|code|math|templater|blockid|hashtag|internal/;

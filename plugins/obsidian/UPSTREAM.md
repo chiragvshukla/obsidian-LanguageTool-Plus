@@ -21,17 +21,27 @@ unmodified upstream files except where listed below. The upstream `test/` and
 
 1. **AI switch and rewrite command**
    - `src/SettingsTab.ts`: added `enableAIFeatures` (default `false`) and
-     `rewriteMode` (default `neutral`) to the settings, plus an "AI features"
-     settings section.
+     `writingMode` (default `neutral`) to the settings, plus a "Writing"
+     section and an "AI features" section. `WRITING_MODES`/`isWritingMode`
+     are exported for validation.
    - `src/rewrite.ts`: new. Calls `POST {serverUrl}/rewrite` on the gateway and
      shows the result in a review modal.
    - `src/index.ts`: added the "Rewrite selection with AI" command. It is
      hidden unless `enableAIFeatures` is on and the editor has a non-empty
      selection.
 
+2. **Writing modes on checks**
+   - `src/api.ts`: sends `writing_mode` on `/v2/check` when `urlMode` is
+     `custom`; the official API never receives the parameter.
+   - `src/helpers.ts`: new `getDocumentMode`, reading the `lt-mode`
+     frontmatter key and rejecting unknown values.
+   - `src/index.ts`: resolves the per-note mode, includes it in the detection
+     cache key, and passes it to the request.
+
 The gateway URL is the existing `serverUrl` setting (bare origin, no `/v2`
 suffix). The rewrite language is the static language setting when it is set
-and not `auto`; otherwise the gateway default applies.
+and not `auto`; otherwise the gateway default applies. The rewrite mode is the
+same `writingMode` setting used by checks.
 
 ## Building
 

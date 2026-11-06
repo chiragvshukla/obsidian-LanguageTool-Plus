@@ -70,7 +70,24 @@ export interface LanguageToolPluginSettings {
 
   // AI features are opt-in. Every AI command checks this flag first.
   enableAIFeatures?: boolean;
-  rewriteMode?: string;
+  writingMode?: WritingMode;
+}
+
+export const WRITING_MODES = {
+  neutral: "Neutral",
+  formal: "Formal",
+  casual: "Casual",
+  academic: "Academic",
+  business: "Business"
+} as const;
+
+export type WritingMode = keyof typeof WRITING_MODES;
+
+export function isWritingMode(value: unknown): value is WritingMode {
+  return (
+    typeof value === "string" &&
+    Object.keys(WRITING_MODES).includes(value)
+  );
 }
 
 export const DEFAULT_SETTINGS: LanguageToolPluginSettings = {
@@ -85,7 +102,7 @@ export const DEFAULT_SETTINGS: LanguageToolPluginSettings = {
   pickyMode: false,
 
   enableAIFeatures: false,
-  rewriteMode: "neutral"
+  writingMode: "neutral"
 };
 
 export function getServerUrl(value: string) {
@@ -739,6 +756,30 @@ export class LanguageToolSettingsTab extends PluginSettingTab {
       ]
     };
 
+    const writingSection: SettingsSection = {
+      heading: "Writing",
+      items: [
+        {
+          name: "Writing mode",
+          desc:
+            "Sent with grammar checks and AI rewrites. A note can override it with lt-mode frontmatter.",
+          render: setting => {
+            setting.addDropdown(component => {
+              component
+                .addOptions(WRITING_MODES)
+                .setValue(this.plugin.settings.writingMode ?? "neutral")
+                .onChange(async value => {
+                  if (isWritingMode(value)) {
+                    this.plugin.settings.writingMode = value;
+                    await this.plugin.saveSettings();
+                  }
+                });
+            });
+          }
+        }
+      ]
+    };
+
     const aiSection: SettingsSection = {
       heading: "AI features",
       items: [
@@ -752,27 +793,6 @@ export class LanguageToolSettingsTab extends PluginSettingTab {
                 .setValue(this.plugin.settings.enableAIFeatures ?? false)
                 .onChange(async value => {
                   this.plugin.settings.enableAIFeatures = value;
-                  await this.plugin.saveSettings();
-                });
-            });
-          }
-        },
-        {
-          name: "Rewrite mode",
-          desc: "Writing mode used by the AI rewrite command",
-          render: setting => {
-            setting.addDropdown(component => {
-              component
-                .addOptions({
-                  neutral: "Neutral",
-                  formal: "Formal",
-                  casual: "Casual",
-                  academic: "Academic",
-                  business: "Business"
-                })
-                .setValue(this.plugin.settings.rewriteMode ?? "neutral")
-                .onChange(async value => {
-                  this.plugin.settings.rewriteMode = value;
                   await this.plugin.saveSettings();
                 });
             });
@@ -859,7 +879,7 @@ export class LanguageToolSettingsTab extends PluginSettingTab {
       ]
     };
 
-    return [mainSection, aiSection, varietySection, ruleSection];
+    return [mainSection, writingSection, aiSection, varietySection, ruleSection];
   }
 
   // Declarative settings (Obsidian 1.13+): rendering and settings search are

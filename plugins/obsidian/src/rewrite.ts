@@ -21,7 +21,7 @@ export async function requestRewrite(
 ): Promise<string> {
   const body: Record<string, string> = {
     text,
-    mode: settings.rewriteMode ?? "neutral"
+    mode: settings.writingMode ?? "neutral"
   };
   if (language) {
     body.language = language;

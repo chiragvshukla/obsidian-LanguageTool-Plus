@@ -148,6 +148,7 @@ function isValidInlineCode(text: string): boolean {
  */
 export interface DetectionOverrides {
   language?: string;
+  mode?: string;
 }
 
 export async function getDetectionResult(
@@ -196,6 +197,12 @@ export async function getDetectionResult(
     enabledOnly: "false",
     level: settings.pickyMode ? "picky" : "default"
   };
+
+  // `writing_mode` is a gateway extension. Send it only to a custom server so
+  // the official LanguageTool API never receives unknown parameters.
+  if (settings.urlMode === "custom") {
+    params.writing_mode = overrides.mode ?? settings.writingMode ?? "neutral";
+  }
 
   if (enabledCategories.length) {
     params.enabledCategories = enabledCategories.join(",");

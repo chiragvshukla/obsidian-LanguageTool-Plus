@@ -63,7 +63,9 @@ In Obsidian, install the plugin from `plugins/obsidian/` (see
 `plugins/obsidian/UPSTREAM.md` for the build) and set its endpoint to
 `http://127.0.0.1:8077` (the plugin appends `/v2` itself). Port `8010` is
 LanguageTool directly and does not apply writing modes. Enable "AI features"
-in the plugin settings to unlock "Rewrite selection with AI".
+in the plugin settings to unlock "Rewrite selection with AI". The "Writing
+mode" setting applies to checks and rewrites; a note can override it with
+`lt-mode` frontmatter.
 
 ## Configuration
 

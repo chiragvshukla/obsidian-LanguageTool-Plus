@@ -26,6 +26,7 @@ import {
   buildNfcOffsetMap,
   editorToCodeMirror,
   getDocumentAutoCheck,
+  getDocumentMode,
   getDocumentLanguage
 } from "./helpers";
 import { getDetectionResult, LanguageToolApiCredentials } from "./api";
@@ -650,11 +651,14 @@ export default class LanguageToolPlugin extends Plugin {
     const toDocOffset = (pos: number) =>
       nfcOffsetMap ? nfcOffsetMap[pos] ?? pos : pos;
 
-    // Identical text checks differently in another language, so the note's
-    // pinned language is part of the cache key. The global settings are not:
-    // saving them clears the cache.
+    // Identical text checks differently in another language or writing mode, so
+    // the note's pinned values are part of the cache key. The global settings
+    // are not: saving them clears the cache.
     const documentLanguage = getDocumentLanguage(this.app, view.file);
-    const hash = hashString(`${documentLanguage ?? ""}\n${text}`);
+    const documentMode = getDocumentMode(this.app, view.file);
+    const hash = hashString(
+      `${documentLanguage ?? ""}\n${documentMode ?? ""}\n${text}`
+    );
 
     let res: LanguageToolApi;
     if (this.hashLru.has(hash)) {
@@ -665,7 +669,7 @@ export default class LanguageToolPlugin extends Plugin {
           text,
           () => this.settings,
           this.getCredentials(),
-          { language: documentLanguage }
+          { language: documentLanguage, mode: documentMode }
         );
         this.hashLru.set(hash, res);
       } catch (e) {
