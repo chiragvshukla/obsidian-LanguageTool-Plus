@@ -152,7 +152,9 @@ Configure the plugin under **Settings → LanguageTool Integration**:
 - **Writing mode:** `neutral`, `formal`, `casual`, `academic`, or `business`.
 - **Enable AI features:** off by default. Required for rewrites and AI checks.
 - **AI grammar / style / vocabulary:** which suggestions the model may return,
-  all on by default. Turn one off to skip that kind of hint everywhere.
+  all on by default. Turn one off to skip that kind of hint everywhere. They
+  are disabled while **Enable AI features** is off and keep their values for
+  when it is switched back on.
 - **AI auto-check current sentence:** optional, off by default. Waits 4
   seconds after typing, then checks the sentence around the cursor. The rest of
   the paragraph is sent as read-only context, so the advice fits the sentence;

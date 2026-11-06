@@ -803,6 +803,8 @@ export class LanguageToolSettingsTab extends PluginSettingTab {
                 .onChange(async value => {
                   this.plugin.settings.enableAIFeatures = value;
                   await this.plugin.saveSettings();
+                  // The category and auto-check toggles follow the master.
+                  this.rerender();
                 });
             });
           }
@@ -815,6 +817,7 @@ export class LanguageToolSettingsTab extends PluginSettingTab {
             setting.addToggle(component => {
               component
                 .setValue(this.plugin.settings.aiGrammar ?? true)
+                .setDisabled(!(this.plugin.settings.enableAIFeatures ?? false))
                 .onChange(async value => {
                   this.plugin.settings.aiGrammar = value;
                   await this.plugin.saveSettings();
@@ -830,6 +833,7 @@ export class LanguageToolSettingsTab extends PluginSettingTab {
             setting.addToggle(component => {
               component
                 .setValue(this.plugin.settings.aiStyle ?? true)
+                .setDisabled(!(this.plugin.settings.enableAIFeatures ?? false))
                 .onChange(async value => {
                   this.plugin.settings.aiStyle = value;
                   await this.plugin.saveSettings();
@@ -845,6 +849,7 @@ export class LanguageToolSettingsTab extends PluginSettingTab {
             setting.addToggle(component => {
               component
                 .setValue(this.plugin.settings.aiVocabulary ?? true)
+                .setDisabled(!(this.plugin.settings.enableAIFeatures ?? false))
                 .onChange(async value => {
                   this.plugin.settings.aiVocabulary = value;
                   await this.plugin.saveSettings();
@@ -860,6 +865,7 @@ export class LanguageToolSettingsTab extends PluginSettingTab {
             setting.addToggle(component => {
               component
                 .setValue(this.plugin.settings.aiAutoCheck ?? false)
+                .setDisabled(!(this.plugin.settings.enableAIFeatures ?? false))
                 .onChange(async value => {
                   this.plugin.settings.aiAutoCheck = value;
                   await this.plugin.saveSettings();
