@@ -32,10 +32,20 @@ equal(
 );
 
 equal(
-  formatTopic({ topic: "Ein Tag im Homeoffice", angle: "Fokus auf den Morgen." }),
-  "> **Writing prompt:** Ein Tag im Homeoffice\n> **Angle:** Fokus auf den Morgen."
+  formatTopic(
+    { topic: "Ein Tag im Homeoffice", angle: "Fokus auf den Morgen." },
+    "de-DE"
+  ),
+  "> **Schreibthema:** Ein Tag im Homeoffice\n> **Fokus:** Fokus auf den Morgen."
 );
 equal(
-  formatTopic({ topic: "  A short walk  ", angle: "   " }),
-  "> **Writing prompt:** A short walk"
+  formatTopic(
+    { topic: "A short walk", angle: "Focus on the morning." },
+    "en-US"
+  ),
+  "> **Writing prompt:** A short walk\n> **Angle:** Focus on the morning."
+);
+equal(
+  formatTopic({ topic: "  Ein Tag im Homeoffice  ", angle: "   " }),
+  "> **Schreibthema:** Ein Tag im Homeoffice"
 );

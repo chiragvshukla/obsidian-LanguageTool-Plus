@@ -195,8 +195,10 @@ possibly credentials.
     fit, vocabulary, and structure and up to three recommendations. One
     LanguageTool pass; one model call for a short note, or one per section plus
     one to combine for a long note. Nothing is applied or stored.
-  - **Insert writing topic with AI** — inserts a practice topic and angle as a
-    blockquote at the cursor in the current note.
+  - **Insert writing topic with AI** - inserts a practice topic and angle as a
+    blockquote at the cursor in the current note. Labels follow the note
+    language: `Schreibthema`/`Fokus` in German, `Writing prompt`/`Angle` in
+    English.
 
 Automatic suggestions pause while the score report is open. AI output is
 validated by the gateway before it reaches the plugin. Numbers, links, and

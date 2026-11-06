@@ -116,8 +116,9 @@ are validated by the gateway before the plugin sees them.
   Notes over `LLM_SCORE_MAX_CHUNKS × LLM_CONTEXT_CHARS` return
   `413 text_too_long`.
 - **Insert writing topic with AI** calls `POST /topic` and inserts the result
-  at the cursor as a blockquote (`Writing prompt` and `Angle` lines). Topics
-  may repeat across sessions; nothing is stored.
+  at the cursor as a blockquote. The labels follow the note language:
+  `Schreibthema`/`Fokus` in German and `Writing prompt`/`Angle` in English.
+  Topics may repeat across sessions; nothing is stored.
 
 The model is slower than LanguageTool (seconds, not milliseconds), so AI
 auto-check is opt-in and scoped to one sentence. Explicit commands state their

@@ -565,7 +565,7 @@ export default class LanguageToolPlugin extends Plugin {
 
     const cursor = editor.getCursor();
     const prefix = cursor.ch === 0 ? "" : "\n\n";
-    const insert = `${prefix}${formatTopic(result)}\n\n`;
+    const insert = `${prefix}${formatTopic(result, language)}\n\n`;
     const offset = editor.posToOffset(cursor);
     editor.replaceRange(insert, cursor);
     editor.setCursor(editor.offsetToPos(offset + insert.length));

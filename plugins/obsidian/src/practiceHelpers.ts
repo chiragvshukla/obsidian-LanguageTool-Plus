@@ -41,11 +41,17 @@ export function formatIssueBreakdown(facts: ScoreFacts): string {
 }
 
 /** The topic is inserted as a blockquote, with its angle on a second line. */
-export function formatTopic(result: TopicResult): string {
-  const lines = [`> **Writing prompt:** ${result.topic.trim()}`];
+export function formatTopic(
+  result: TopicResult,
+  language?: string
+): string {
+  const german = !language || language.toLowerCase().startsWith("de");
+  const promptLabel = german ? "Schreibthema" : "Writing prompt";
+  const angleLabel = german ? "Fokus" : "Angle";
+  const lines = [`> **${promptLabel}:** ${result.topic.trim()}`];
   const angle = result.angle.trim();
   if (angle) {
-    lines.push(`> **Angle:** ${angle}`);
+    lines.push(`> **${angleLabel}:** ${angle}`);
   }
   return lines.join("\n");
 }
