@@ -365,7 +365,7 @@ export default class LanguageToolPlugin extends Plugin {
   private async rewriteSelection(editor: Editor): Promise<void> {
     const text = editor.getSelection();
     const language = this.settings.staticLanguage;
-    const rewritten = await requestRewrite(
+    const { rewritten, changes } = await requestRewrite(
       this.settings,
       text,
       language && language !== "auto" ? language : undefined
@@ -376,7 +376,7 @@ export default class LanguageToolPlugin extends Plugin {
       return;
     }
 
-    new RewriteModal(this.app, text, rewritten, value => {
+    new RewriteModal(this.app, text, rewritten, changes, value => {
       editor.replaceSelection(value);
     }).open();
   }

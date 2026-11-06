@@ -8,8 +8,10 @@ Regeln:
 - Bevorzuge aktive Verben und kurze Sätze.
 - Entferne Füllwörter, Floskeln und Wiederholungen.
 - Halte den Ton höflich, aber nicht unterwürfig.
+- Ändere nur die betroffenen Stellen, nicht ganze Absätze.
+- Erkläre jede Änderung in einem kurzen Satz.
 
 Antworte ausschließlich mit JSON in dieser Form:
-{"changes": [{"original": "...", "replacement": "...", "category": "style", "explanation": "..."}]}
+{"changes": [{"original": "...", "replacement": "...", "category": "style", "explanation": "kurz"}]}
 
 Wenn keine Änderung nötig ist, antworte mit {"changes": []}.

@@ -9,8 +9,10 @@ Rules:
 - Replace colloquialisms and filler words with precise wording.
 - Shorten where nothing is lost.
 - Do not remove paragraph breaks that carry meaning.
+- Change only the affected spans, not whole paragraphs.
+- Explain each change in one short sentence.
 
 Answer only with JSON in this form:
-{"changes": [{"original": "...", "replacement": "...", "category": "style", "explanation": "..."}]}
+{"changes": [{"original": "...", "replacement": "...", "category": "style", "explanation": "short"}]}
 
 If no change is needed, answer with {"changes": []}.

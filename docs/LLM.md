@@ -22,8 +22,8 @@ official `openai` SDK, so no provider-specific fields are sent.
 | `LLM_BASE_URL` | OpenAI-compatible base URL | `http://127.0.0.1:11434/v1` |
 | `LLM_API_KEY` | API key; `ollama` for local | `ollama` |
 | `LLM_MODEL` | Model identifier | `gemma4:e4b-it-q4_K_M` |
-| `LLM_TIMEOUT_SECONDS` | Per-request timeout | `30` |
-| `LLM_MAX_TOKENS` | Response cap | `1024` |
+| `LLM_TIMEOUT_SECONDS` | Per-request timeout | `60` |
+| `LLM_MAX_TOKENS` | Response cap | `4096` |
 | `LLM_CONTEXT_CHARS` | Maximum rewrite input, in characters | `12000` |
 | `LLM_CACHE_SIZE` | Successful rewrites kept in memory | `128` |
 
@@ -149,4 +149,14 @@ Not implemented. A selection longer than `LLM_CONTEXT_CHARS` is rejected with
 `text_too_long`; select a shorter passage. Chunking can be added without
 changing the response shape.
 
+The practical limit is the response budget, not the input cap: the model must
+emit every original span, replacement, and explanation. Prompts therefore ask
+for changed spans only and one short explanation per change, and the default
+response cap is `4096` tokens. With `gemma4:e4b-it-q4_K_M`, a 2,200-character
+German paragraph passed in about 37 s at that cap.
+
 `shortcut: rewrites are single-chunk, add paragraph chunking if whole-document rewrites become a use case.`
+
+A repository `.env` overrides the defaults above. If rewrites still truncate,
+check that it does not pin `LLM_MAX_TOKENS` or `LLM_TIMEOUT_SECONDS` to older
+values; do not commit that file.

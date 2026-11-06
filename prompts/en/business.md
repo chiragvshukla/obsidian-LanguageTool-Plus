@@ -8,8 +8,10 @@ Rules:
 - Prefer active verbs and short sentences.
 - Remove filler words, stock phrases, and repetition.
 - Keep the tone polite without being servile.
+- Change only the affected spans, not whole paragraphs.
+- Explain each change in one short sentence.
 
 Answer only with JSON in this form:
-{"changes": [{"original": "...", "replacement": "...", "category": "style", "explanation": "..."}]}
+{"changes": [{"original": "...", "replacement": "...", "category": "style", "explanation": "short"}]}
 
 If no change is needed, answer with {"changes": []}.

@@ -5,20 +5,33 @@ interface RewriteErrorBody {
   error?: { message?: string };
 }
 
+interface RewriteChange {
+  original: string;
+  replacement: string;
+  category?: string;
+  explanation?: string;
+}
+
 interface RewriteResponseBody {
   rewritten: string;
+  changes?: RewriteChange[];
+}
+
+export interface RewriteResult {
+  rewritten: string;
+  changes: RewriteChange[];
 }
 
 /**
  * Ask the gateway for a rewrite. Only call this when AI features are enabled.
- * The gateway returns {original, rewritten, changes}; the plugin uses
- * `rewritten` and leaves review of individual changes to a later phase.
+ * The gateway returns {original, rewritten, changes}; the modal shows the
+ * rewritten text and the short explanation for each change.
  */
 export async function requestRewrite(
   settings: LanguageToolPluginSettings,
   text: string,
   language?: string
-): Promise<string> {
+): Promise<RewriteResult> {
   const body: Record<string, string> = {
     text,
     mode: settings.writingMode ?? "neutral"
@@ -48,7 +61,8 @@ export async function requestRewrite(
     throw new Error(message);
   }
 
-  return (res.json as RewriteResponseBody).rewritten;
+  const payload = res.json as RewriteResponseBody;
+  return { rewritten: payload.rewritten, changes: payload.changes ?? [] };
 }
 
 /** Show the original and the rewrite side by side before replacing. */
@@ -57,6 +71,7 @@ export class RewriteModal extends Modal {
     app: App,
     private readonly original: string,
     private readonly rewritten: string,
+    private readonly changes: RewriteChange[],
     private readonly onReplace: (value: string) => void
   ) {
     super(app);
@@ -69,6 +84,18 @@ export class RewriteModal extends Modal {
     contentEl.createEl("pre", { text: this.original });
     contentEl.createEl("h3", { text: "Rewritten" });
     contentEl.createEl("pre", { text: this.rewritten });
+
+    if (this.changes.length > 0) {
+      contentEl.createEl("h3", { text: "Changes" });
+      const list = contentEl.createEl("ul");
+      for (const change of this.changes) {
+        list.createEl("li", {
+          text:
+            change.explanation ||
+            `${change.original} → ${change.replacement}`
+        });
+      }
+    }
 
     new Setting(contentEl)
       .addButton(button =>

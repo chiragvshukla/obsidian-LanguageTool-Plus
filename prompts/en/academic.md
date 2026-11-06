@@ -8,8 +8,10 @@ Rules:
 - Remove redundancy, filler words, and needless hedging.
 - Replace colloquial language with technical language without inventing content.
 - Add no new arguments and no new sources.
+- Change only the affected spans, not whole paragraphs.
+- Explain each change in one short sentence.
 
 Answer only with JSON in this form:
-{"changes": [{"original": "...", "replacement": "...", "category": "style", "explanation": "..."}]}
+{"changes": [{"original": "...", "replacement": "...", "category": "style", "explanation": "short"}]}
 
 If no change is needed, answer with {"changes": []}.
