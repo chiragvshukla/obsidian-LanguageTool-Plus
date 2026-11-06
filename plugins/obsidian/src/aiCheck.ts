@@ -11,6 +11,19 @@ export const AI_AUTO_MAX_CHARS = 2000;
 export const AI_CONTEXT_MAX_CHARS = 1000;
 
 /**
+ * Whether an editor update should arm the automatic AI pass. Typing always
+ * does; a selection-only update does only when the cursor is empty, because a
+ * selected range has no single sentence to check.
+ */
+export function shouldAutoCheckAfterUpdate(update: {
+  docChanged: boolean;
+  selectionSet: boolean;
+  selectionEmpty: boolean;
+}): boolean {
+  return update.docChanged || (update.selectionSet && update.selectionEmpty);
+}
+
+/**
  * The paragraph text before and after `range`, trimmed to the nearest
  * `limit` characters. The gateway treats it as read-only context.
  */

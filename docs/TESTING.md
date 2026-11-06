@@ -41,6 +41,23 @@ It returns canned JSON per scenario. This keeps CI fast and deterministic.
 4. LLM validator chain (reject bad length, changed numbers, invalid JSON).
 5. Annotated-JSON round-trip once Phase 4 starts.
 
+## Plugin units
+
+The plugin's pure helpers have no Obsidian dependency and run under `tsx`:
+match mapping, paragraph/sentence bounds, context trimming, dictionary word
+extraction, frontmatter bounds, document chunking, rewrite guards, and the
+auto-check trigger decision. CI runs them after build and lint.
+
+```powershell
+cd plugins/obsidian
+npm run test:ai
+```
+
+A behaviour change in `aiCheck.ts`, `dictionaryHelpers.ts`, `documentChunk.ts`,
+`practiceHelpers.ts`, or `rewriteGuard.ts` needs a case there. The trigger is a
+pure function (`shouldAutoCheckAfterUpdate`) precisely so it can be tested
+without a live CodeMirror view.
+
 ## Commands
 
 ```powershell

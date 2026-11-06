@@ -143,11 +143,15 @@ tree. It asks `GET /dictionary/lookup?word=…&pair=…` and stays silent on a m
 or when the gateway is down. Results render the headword with the article from
 the source entry and its part of speech (`das Haus`, noun), plus up to three
 senses. German inflected forms are resolved by the gateway's alias
-index, so hovering `Häuser` shows `Haus`. Lookups are cached in memory for the
-session.
+index, so hovering `Häuser` shows `Haus`. Successful lookups are cached in
+memory for the session; a failed or offline lookup is not cached, so a gateway
+that starts later is tried again on the next hover. The frontmatter boundary
+comes from Obsidian's metadata cache, so a hover does not copy the whole note.
 
-The three data pairs live under `data/wordbook/` and are git-ignored. See
-ADR-018 and `THIRD_PARTY_NOTICES.md`.
+The three data pairs live under `data/wordbook/` and are git-ignored. German
+entries and their alias rows share one gzip file, so one atomic replace updates
+both; the loader also reads a legacy `de.aliases.jsonl.gz` until the next
+build. See ADR-018 and `THIRD_PARTY_NOTICES.md`.
 
 ## Fork changes (Phase 6)
 
@@ -171,6 +175,14 @@ Implemented:
     a call-count notice. Rewrite stays selection-only.
 11. Dictionary pair selection in the shared ribbon/status menu, and a readable
     hover tooltip in both themes.
+12. Cursor-triggered AI auto-check: moving the cursor checks an older sentence
+    after the same 4-second pause, and a non-empty selection cancels the pass.
+13. Plugin unit tests run in CI (`npm run test:ai`); the auto-check decision is
+    a pure, tested helper.
+
+The editor decoration state is updated immutably, as CodeMirror requires, so
+undo and branching transactions cannot inherit ignored ranges from a later
+transaction.
 
 Do not modify the upstream request shape otherwise. Record the upstream commit
 in `plugins/obsidian/UPSTREAM.md` and keep the AGPL-3.0 license.

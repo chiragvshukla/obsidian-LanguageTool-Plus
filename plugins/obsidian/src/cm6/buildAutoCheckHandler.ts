@@ -2,6 +2,7 @@ import { EditorView, ViewPlugin, ViewUpdate } from "@codemirror/view";
 import { editorInfoField, MarkdownView } from "obsidian";
 import LanguageToolPlugin from "src";
 import { getDocumentAutoCheck } from "../helpers";
+import { shouldAutoCheckAfterUpdate } from "../aiCheck";
 
 // The model is much slower than LanguageTool, so the automatic pass waits
 // longer and checks only the sentence around the cursor.
@@ -30,8 +31,7 @@ export function buildAutoCheckHandler(plugin: LanguageToolPlugin) {
       update(update: ViewUpdate) {
         // A cursor move is a selection-only update. It must still arm the AI
         // pass, so a sentence the user did not just type can be checked.
-        const cursorSettled =
-          update.selectionSet && update.state.selection.main.empty;
+        const selectionEmpty = update.state.selection.main.empty;
         if (!update.docChanged && !update.selectionSet) {
           return;
         }
@@ -44,7 +44,13 @@ export function buildAutoCheckHandler(plugin: LanguageToolPlugin) {
 
         // A non-empty selection has no single sentence to check. Drop a pending
         // pass so selecting text does not fire one.
-        if (!update.docChanged && !cursorSettled) {
+        if (
+          !shouldAutoCheckAfterUpdate({
+            docChanged: update.docChanged,
+            selectionSet: update.selectionSet,
+            selectionEmpty
+          })
+        ) {
           window.clearTimeout(aiTimer);
           aiTimer = -1;
           return;

@@ -1,10 +1,9 @@
 import { EditorView, hoverTooltip, Tooltip } from "@codemirror/view";
 import { syntaxTree } from "@codemirror/language";
-import { requestUrl } from "obsidian";
+import { editorInfoField, requestUrl } from "obsidian";
 import LanguageToolPlugin from "src";
 import {
   DictionaryStatus,
-  frontmatterEnd,
   isSkippedNode,
   isUrl,
   wordAt
@@ -57,7 +56,7 @@ async function lookup(
       throw: false
     });
     if (response.status !== 200) {
-      cachePut(key, null);
+      // Do not remember an outage as "this word has no entry".
       return null;
     }
     const result = response.json as DictionaryResult;
@@ -65,9 +64,8 @@ async function lookup(
     cachePut(key, value);
     return value;
   } catch {
-    // A miss or an offline gateway stays silent; LM errors are not useful
+    // A miss or an offline gateway stays silent; LLM errors are not useful
     // while merely hovering.
-    cachePut(key, null);
     return null;
   }
 }
@@ -102,7 +100,14 @@ export function buildDictionaryHover(plugin: LanguageToolPlugin) {
       if (!plugin.settings.dictionaryHover) {
         return null;
       }
-      if (position < frontmatterEnd(view.state.doc.toString())) {
+      // Read the frontmatter end from Obsidian's cache instead of copying the
+      // whole document on every hover.
+      const file = view.state.field(editorInfoField).file;
+      const bodyStart = file
+        ? plugin.app.metadataCache.getFileCache(file)?.frontmatterPosition?.end
+            .offset
+        : undefined;
+      if (bodyStart !== undefined && position < bodyStart) {
         return null;
       }
 

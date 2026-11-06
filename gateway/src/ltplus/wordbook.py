@@ -38,8 +38,17 @@ def _entries_path(directory: Path, pair: str) -> Path:
     return directory / f"{pair}.entries.jsonl.gz"
 
 
-def _aliases_path(directory: Path) -> Path:
+def _legacy_aliases_path(directory: Path) -> Path:
+    """Kept for installs built before aliases moved into the entries file."""
     return directory / "de.aliases.jsonl.gz"
+
+
+def _add_alias(aliases: dict[str, list[str]], row: dict[str, Any]) -> None:
+    targets = aliases.setdefault(normalize(row["a"]), [])
+    if row["l"] not in targets:
+        targets.append(row["l"])
+    if len(targets) > _MAX_ALIASES:
+        targets.pop()
 
 
 class Wordbook:
@@ -111,27 +120,39 @@ class Wordbook:
         if not path.is_file():
             raise FileNotFoundError(path)
         loaded: dict[str, list[dict[str, Any]]] = {}
+        aliases: dict[str, list[str]] | None = {} if pair == "de-de" else None
         with gzip.open(path, "rt", encoding="utf-8") as handle:
             for line in handle:
                 row = json.loads(line)
-                loaded.setdefault(normalize(row["w"]), []).append(row)
+                if "w" in row:
+                    loaded.setdefault(normalize(row["w"]), []).append(row)
+                elif aliases is not None and "a" in row:
+                    _add_alias(aliases, row)
         self._index[pair] = loaded
+        # One pass builds both indexes; a separate alias read would decompress
+        # the same large file again.
+        if aliases and self._aliases is None:
+            self._aliases = aliases
         return loaded
 
     def _load_aliases(self) -> dict[str, list[str]]:
         if self._aliases is not None:
             return self._aliases
         aliases: dict[str, list[str]] = {}
-        path = _aliases_path(self.directory)
-        if path.is_file():
+
+        def add(path: Path) -> None:
             with gzip.open(path, "rt", encoding="utf-8") as handle:
                 for line in handle:
                     row = json.loads(line)
-                    targets = aliases.setdefault(normalize(row["a"]), [])
-                    if row["l"] not in targets:
-                        targets.append(row["l"])
-                    if len(targets) > _MAX_ALIASES:
-                        targets.pop()
+                    if "a" in row:
+                        _add_alias(aliases, row)
+
+        shared = _entries_path(self.directory, "de-de")
+        if shared.is_file():
+            add(shared)
+        legacy = _legacy_aliases_path(self.directory)
+        if not aliases and legacy.is_file():
+            add(legacy)
         self._aliases = aliases
         return aliases
 

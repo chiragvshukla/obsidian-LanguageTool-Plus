@@ -149,13 +149,14 @@ Every response is validated before it is returned:
   findings per rule ID. A new rule, or one that now occurs more often, fails
   validation. Findings with `issueType: style` never do.
 - If the whole set adds a correctness finding, each of up to 12 changes is
-  checked alone; the unsafe ones are dropped and the rest is returned with
-  `dropped: N` (ADR-021). If every change is unsafe, the request fails.
+  checked alone; those checks run concurrently, and the unsafe ones are dropped
+  so the rest is returned with `dropped: N` (ADR-021). If every change is
+  unsafe, the request fails.
 
 Replies are parsed tolerantly before failing: think blocks, code fences, and
 prose around the object are stripped, and the last complete JSON object is
 used. If the reply was cut off at the token cap, one retry runs with twice the
-budget (capped at 16384). If no JSON object matches the schema, one repair call
+budget (capped at 65536). If no JSON object matches the schema, one repair call
 asks the model to reformat its own answer. Only then does the request fail with
 `llm_invalid_json`, `llm_truncated`, or `llm_empty_answer`. Each failure logs
 structure only — length, finish reason, and the presence of fences or a think

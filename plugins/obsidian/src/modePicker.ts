@@ -6,52 +6,66 @@ import {
   WritingMode
 } from "./SettingsTab";
 
-/** Quick mode switch from the status bar and ribbon menus. */
-export class WritingModeModal extends FuzzySuggestModal<WritingMode> {
+/** One fuzzy picker shared by the writing-mode and dictionary menus. */
+class PickerModal<T> extends FuzzySuggestModal<T> {
   constructor(
     app: App,
-    private readonly current: WritingMode | undefined,
-    private readonly choose: (mode: WritingMode) => void
+    placeholder: string,
+    private readonly items: T[],
+    private readonly current: T | undefined,
+    private readonly label: (item: T) => string,
+    private readonly choose: (item: T) => void
   ) {
     super(app);
-    this.setPlaceholder("Writing mode");
+    this.setPlaceholder(placeholder);
   }
 
-  getItems(): WritingMode[] {
-    return Object.keys(WRITING_MODES) as WritingMode[];
+  getItems(): T[] {
+    return this.items;
   }
 
-  getItemText(mode: WritingMode): string {
-    const label = WRITING_MODES[mode];
-    return mode === this.current ? `${label} (current)` : label;
+  getItemText(item: T): string {
+    const label = this.label(item);
+    return item === this.current ? `${label} (current)` : label;
   }
 
-  onChooseItem(mode: WritingMode): void {
-    this.choose(mode);
+  onChooseItem(item: T): void {
+    this.choose(item);
+  }
+}
+
+/** Quick mode switch from the status bar and ribbon menus. */
+export class WritingModeModal extends PickerModal<WritingMode> {
+  constructor(
+    app: App,
+    current: WritingMode | undefined,
+    choose: (mode: WritingMode) => void
+  ) {
+    super(
+      app,
+      "Writing mode",
+      Object.keys(WRITING_MODES) as WritingMode[],
+      current,
+      mode => WRITING_MODES[mode],
+      choose
+    );
   }
 }
 
 /** Quick dictionary pair switch from the status bar and ribbon menus. */
-export class DictionaryPairModal extends FuzzySuggestModal<DictionaryPair> {
+export class DictionaryPairModal extends PickerModal<DictionaryPair> {
   constructor(
     app: App,
-    private readonly current: DictionaryPair | undefined,
-    private readonly choose: (pair: DictionaryPair) => void
+    current: DictionaryPair | undefined,
+    choose: (pair: DictionaryPair) => void
   ) {
-    super(app);
-    this.setPlaceholder("Dictionary pair");
-  }
-
-  getItems(): DictionaryPair[] {
-    return Object.keys(DICTIONARY_PAIRS) as DictionaryPair[];
-  }
-
-  getItemText(pair: DictionaryPair): string {
-    const label = DICTIONARY_PAIRS[pair];
-    return pair === this.current ? `${label} (current)` : label;
-  }
-
-  onChooseItem(pair: DictionaryPair): void {
-    this.choose(pair);
+    super(
+      app,
+      "Dictionary pair",
+      Object.keys(DICTIONARY_PAIRS) as DictionaryPair[],
+      current,
+      pair => DICTIONARY_PAIRS[pair],
+      choose
+    );
   }
 }

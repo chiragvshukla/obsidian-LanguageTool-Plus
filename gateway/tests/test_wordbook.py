@@ -80,11 +80,6 @@ def make_book(directory: Path) -> Wordbook:
             {"w": "gehen", "p": "verb", "g": "", "s": ["to go"]},
             {"w": "Bank", "p": "noun", "g": "f", "s": ["bench"]},
             {"w": "Bank", "p": "noun", "g": "f", "s": ["bank"]},
-        ],
-    )
-    write_gzip(
-        directory / "de.aliases.jsonl.gz",
-        [
             {"a": "Häuser", "l": "Haus"},
             {"a": "ging", "l": "gehen"},
         ],
@@ -131,13 +126,24 @@ def test_kaikki_build_writes_entries_and_aliases(tmp_path: Path) -> None:
     _build_kaikki(source, tmp_path)
 
     with gzip.open(tmp_path / "de-de.entries.jsonl.gz", "rt", encoding="utf-8") as handle:
-        entries = [json.loads(line) for line in handle]
-    with gzip.open(tmp_path / "de.aliases.jsonl.gz", "rt", encoding="utf-8") as handle:
-        aliases = [json.loads(line) for line in handle]
+        rows = [json.loads(line) for line in handle]
 
+    entries = [row for row in rows if "w" in row]
+    aliases = [row for row in rows if "a" in row]
     assert [entry["w"] for entry in entries] == ["Haus", "gehen", "laufen"]
     assert {"a": "ging", "l": "gehen"} in aliases
     assert all(alias["a"] != "gegangen" or alias["l"] == "gehen" for alias in aliases)
+    assert not (tmp_path / "de.aliases.jsonl.gz").exists()
+
+
+def test_lookup_reads_legacy_alias_file(tmp_path: Path) -> None:
+    write_gzip(
+        tmp_path / "de-de.entries.jsonl.gz",
+        [{"w": "Haus", "p": "noun", "g": "n", "s": ["building"]}],
+    )
+    write_gzip(tmp_path / "de.aliases.jsonl.gz", [{"a": "Häuser", "l": "Haus"}])
+
+    assert Wordbook(tmp_path).lookup("de-de", "Häuser")["lemma"] == "Haus"
 
 
 def test_lookup_resolves_alias_and_keeps_ambiguity(tmp_path: Path) -> None:

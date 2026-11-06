@@ -92,7 +92,9 @@ selection check; those matches never pass through `/v2/check`.
 3. Gateway calls the OpenAI-compatible endpoint with `response_format`.
 4. Response is validated (JSON shape, ordered changes, length ratio,
    numbers/links/code preserved, re-checked by LanguageTool with the mode's
-   parameters; style findings do not block).
+   parameters; style findings do not block). When the combined set adds a
+   finding, the per-change checks run concurrently, so the wall-clock cost
+   stays close to two sequential checks instead of one per change.
 5. Gateway returns `{original, rewritten, changes}`, plus `dropped` when unsafe
    changes were removed.
 
@@ -106,7 +108,9 @@ Successful rewrites are cached in memory. Inline checks never call the LLM.
 | Mode profiles | `modes/*.yaml` | repo |
 | Style rules | `rules/grammar_custom.xml`, `rules/lexicon.yaml` | repo |
 | Personal dictionary | `data/dictionary/<lang>.txt` | repo working tree |
+| Wordbook indexes | `data/wordbook/` (entries + German aliases in one gzip per pair) | rebuildable, git-ignored |
 | LLM cache | process memory (LRU) | lost on restart |
+| Detection cache (plugin) | process memory, 10 entries | lost on restart |
 | Logs | stdout / files | optional |
 
 A database is intentionally absent. Revisit only if concurrent writers,

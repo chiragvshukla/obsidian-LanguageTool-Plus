@@ -33,6 +33,10 @@ does not install a service manager. Mode, prompt, rule, and dictionary edits
 need a gateway restart; personal dictionary edits apply on the next check.
 Downloaded wordbook data applies immediately and needs no restart.
 
+For plugin development, `cd plugins/obsidian; npm run dev` rebuilds `main.js` in
+watch mode. Copy it to the vault after a successful build; the unit tests run
+with `npm run test:ai` and in CI.
+
 ## What to back up
 
 | Item | Where | Notes |
@@ -40,7 +44,7 @@ Downloaded wordbook data applies immediately and needs no restart.
 | Gateway config | `.env` | Contains no secrets by default, but may hold an API key. Back it up securely, never commit it. |
 | Modes, prompts, rules, lexicon | `modes/`, `prompts/`, `rules/` | Tracked in git. |
 | Personal dictionary | `data/dictionary/*.txt` | Tracked in git; edit freely. |
-| Wordbook (hover dictionary) | `data/wordbook/` | Git-ignored and safe to delete; rebuild from the plugin settings or `scripts/build_dictionary.py`. |
+| Wordbook (hover dictionary) | `data/wordbook/` | Git-ignored and safe to delete; rebuild from the plugin settings or `scripts/build_dictionary.py`. German entries and aliases share one gzip per pair, so a rebuild replaces both atomically. |
 | Obsidian notes | Your vault | Back up separately; not part of this repo. |
 | LLM cache | Gateway memory | Volatile. Nothing to back up. |
 | LanguageTool data | Docker volume/image | None. The image is pull-only; no state. |

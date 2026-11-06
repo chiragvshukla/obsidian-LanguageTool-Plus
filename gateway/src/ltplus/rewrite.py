@@ -10,6 +10,7 @@ never sent to the client.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import re
@@ -484,15 +485,23 @@ async def _drop_unsafe_changes(
     """
     if len(changes) > MAX_SAFE_CHECKS:
         return None
-    kept: list[LLMChange] = []
+    candidates: list[tuple[LLMChange, str]] = []
     for change in changes:
         try:
             rewritten, _, _ = _apply_changes(text, [change])
         except ValidationFailure:
             continue
-        after = await _finding_counts(lt, language, mode, rewritten)
-        if not _added_findings(before, after):
-            kept.append(change)
+        candidates.append((change, rewritten))
+    # One LanguageTool call per change, but run them together instead of
+    # paying the round-trip time twelve times.
+    counts = await asyncio.gather(
+        *(_finding_counts(lt, language, mode, rewritten) for _, rewritten in candidates)
+    )
+    kept = [
+        change
+        for (change, _), after in zip(candidates, counts, strict=True)
+        if not _added_findings(before, after)
+    ]
     if len(kept) == len(changes):
         return None
     return kept

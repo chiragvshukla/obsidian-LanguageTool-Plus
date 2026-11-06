@@ -11,7 +11,6 @@ import {
 } from "obsidian";
 import { Decoration, EditorView } from "@codemirror/view";
 import { StateEffect } from "@codemirror/state";
-import QuickLRU from "quick-lru";
 import {
   DEFAULT_SETTINGS,
   DICTIONARY_PAIRS,
@@ -105,9 +104,9 @@ export default class LanguageToolPlugin extends Plugin {
   public settings: LanguageToolPluginSettings;
   private statusBarText: HTMLElement;
 
-  private readonly hashLru = new QuickLRU<number, LanguageToolApi>({
-    maxSize: 10
-  });
+  // Bounded so long sessions do not keep every checked text alive. A plain Map
+  // is enough here; the oldest key is dropped first.
+  private readonly hashLru = new Map<number, LanguageToolApi>();
 
   private isloading = false;
   private ribbonIcon: HTMLElement | null = null;
@@ -1324,6 +1323,12 @@ export default class LanguageToolPlugin extends Plugin {
           );
         }
         this.hashLru.set(hash, res);
+        if (this.hashLru.size > 10) {
+          for (const oldest of this.hashLru.keys()) {
+            this.hashLru.delete(oldest);
+            break;
+          }
+        }
       } catch (e) {
         this.setStatusBarReady();
         return Promise.reject(e instanceof Error ? e : new Error(String(e)));

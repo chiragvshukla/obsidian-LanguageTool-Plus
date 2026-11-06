@@ -67,7 +67,6 @@ reproduced below; one copy of the MIT license text follows the list.
 - `annotatedtext-remark` — Copyright (c) 2018 David L. Day
 - `escape-string-regexp` — Copyright (c) Sindre Sorhus <sindresorhus@gmail.com> (https://sindresorhus.com)
 - `is-plain-obj` — Copyright (c) Sindre Sorhus <sindresorhus@gmail.com> (https://sindresorhus.com)
-- `quick-lru` — Copyright (c) Sindre Sorhus <sindresorhus@gmail.com> (https://sindresorhus.com)
 - `is-buffer` — Copyright (c) Feross Aboukhadijeh
 - `extend` — Copyright (c) 2014 Stefan Thomas
 - `format` — Copyright Sami Samhuri. The package ships no license file and

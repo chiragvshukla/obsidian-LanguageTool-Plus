@@ -81,46 +81,38 @@ export const ignoredUnderlineField = StateField.define<{
     };
   },
   update(state, tr) {
-    state.marks = state.marks.map(tr.changes);
-
-    // Rebuild ignoredRanges to account for tr.changes
-    state.ignoredRanges.clear();
-    state.marks.between(0, tr.newDoc.length, (from, to) => {
-      state.ignoredRanges.add(`${from},${to}`);
-    });
+    let marks = state.marks.map(tr.changes);
 
     // Clear out any decorations when their contents are edited
-    if (tr.docChanged && tr.selection && state.marks.size) {
-      state.marks = state.marks.update({
-        filter: (from, to) => {
-          const shouldKeepRange = filterUnderlines(
+    if (tr.docChanged && tr.selection && marks.size) {
+      marks = marks.update({
+        filter: (from, to) =>
+          filterUnderlines(
             from,
             to,
             tr.selection!.main.from,
             tr.selection!.main.to
-          );
-
-          if (!shouldKeepRange) {
-            state.ignoredRanges.delete(`${from},${to}`);
-          }
-
-          return shouldKeepRange;
-        }
+          )
       });
     }
 
     for (const e of tr.effects) {
       if (e.is(ignoreUnderline)) {
         const { from, to } = e.value;
-
-        state.ignoredRanges.add(`${from},${to}`);
-        state.marks = state.marks.update({
+        marks = marks.update({
           add: [Decoration.mark({}).range(from, to)]
         });
       }
     }
 
-    return state;
+    // Rebuild after every change so the set matches the final decorations.
+    // State values are immutable; never touch `state` in place.
+    const ignoredRanges = new Set<string>();
+    marks.between(0, tr.newDoc.length, (from, to) => {
+      ignoredRanges.add(`${from},${to}`);
+    });
+
+    return { marks, ignoredRanges };
   }
 });
 

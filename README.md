@@ -17,6 +17,21 @@ features" switch (off by default), a rewrite command, and a selection-scoped AI
 check that reuses the existing underlines. The upstream plugin also works
 against the gateway in pass-through mode.
 
+What you can do in Obsidian:
+
+- Check the note or selection with LanguageTool; underlines and the popover
+  work as before, with writing modes applied on the gateway.
+- Rewrite a selection, review changed spans, then replace or cancel.
+- Check a selection, the paragraph around the cursor, or the whole document
+  with AI, with hints drawn as normal (dashed) underlines.
+- Let the optional auto-check follow the cursor: after 4 seconds it checks the
+  sentence you are on, including an older sentence you clicked into.
+- Score a note (exact counts plus 1–5 grades and up to three recommendations)
+  or insert a writing topic as a blockquote.
+- Hover a word for a local dictionary entry, independent of the AI switch.
+
+See [`USAGE.md`](USAGE.md) for the full walkthrough.
+
 > **Status:** Phase 9 complete. The gateway proxies `/v2/check` and
 > `/v2/languages`, applies writing modes, and serves `/rewrite`, `/score`,
 > `/topic`, and `/dictionary/*`. The plugin supports selection rewrites,
@@ -90,9 +105,13 @@ the build) and set its endpoint to
 LanguageTool directly and does not apply writing modes. Enable "AI features"
 in the plugin settings to unlock "Rewrite selection with AI" and "Check
 selection with AI"; the latter shows model changes as inline suggestions. An
-optional "AI auto-check current sentence" setting checks after a 4-second
-pause. The "Writing mode" setting applies to checks and rewrites; a note can
-override it with `lt-mode` frontmatter.
+optional "AI auto-check current sentence" setting checks after a 4-second pause
+without typing or moving the cursor. The "Writing mode" setting applies to
+checks and rewrites; a note can override it with `lt-mode` frontmatter.
+
+For plugin development, `cd plugins/obsidian; npm install; npm run dev` watches
+and rebuilds `main.js`. `npm run build` type-checks, `npm run test:ai` runs the
+pure unit tests (also run in CI), and `npm run lint` checks the source.
 
 ## Configuration
 

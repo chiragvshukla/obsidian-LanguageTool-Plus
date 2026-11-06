@@ -48,7 +48,8 @@ export function frontmatterEnd(doc: string): number {
   if (closing === -1) {
     return 0;
   }
-  return 4 + closing + doc.slice(4 + closing).indexOf("\n") + 1;
+  const lineEnd = doc.slice(4 + closing).indexOf("\n");
+  return lineEnd === -1 ? doc.length : 4 + closing + lineEnd + 1;
 }
 
 export function isSkippedNode(name: string): boolean {

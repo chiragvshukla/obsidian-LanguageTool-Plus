@@ -1,5 +1,12 @@
 import { Text } from "@codemirror/state";
-import { changesToMatches, contextAround, isAIUnderline, paragraphAt, sentenceAt } from "./aiCheck";
+import {
+  changesToMatches,
+  contextAround,
+  isAIUnderline,
+  paragraphAt,
+  sentenceAt,
+  shouldAutoCheckAfterUpdate
+} from "./aiCheck";
 
 function equal(actual: unknown, expected: unknown) {
   if (JSON.stringify(actual) !== JSON.stringify(expected)) {
@@ -90,6 +97,17 @@ for (let pos = 0; pos <= sentences.length; pos++) {
     throw new Error(`sentenceAt returned nothing at position ${pos}`);
   }
 }
+
+// Cursor movement must arm the auto-check; a non-empty selection must not.
+const update = (docChanged: boolean, selectionSet: boolean, selectionEmpty: boolean) => ({
+  docChanged,
+  selectionSet,
+  selectionEmpty
+});
+equal(shouldAutoCheckAfterUpdate(update(true, false, false)), true);
+equal(shouldAutoCheckAfterUpdate(update(false, true, true)), true);
+equal(shouldAutoCheckAfterUpdate(update(false, true, false)), false);
+equal(shouldAutoCheckAfterUpdate(update(false, false, false)), false);
 
 const aiDecoration = { spec: { match: { rule: { id: "AI_GRAMMAR" } } } };
 const ltDecoration = { spec: { match: { rule: { id: "MORFOLOGIK_RULE_DE_DE" } } } };

@@ -321,9 +321,12 @@ does not depend on the AI master switch.
 
 **Consequences:** the first build downloads roughly 350 MB and takes minutes;
 afterwards lookup is local and instant, and the generated data never enters
-git. Without a lemma tagger the alias index can be patchy for unusual forms;
-the cap of five aliases per form keeps homograph groups bounded. The indexes
-load lazily per pair, so a cold first hover can pause briefly.
+git. German entries and aliases share one gzip file, so one `os.replace` swaps
+both and a crash cannot leave them from different builds; a legacy
+`de.aliases.jsonl.gz` is still read until the next build. Without a lemma tagger
+the alias index can be patchy for unusual forms; the cap of five aliases per
+form keeps homograph groups bounded. The indexes load lazily per pair, so a
+cold first hover can pause briefly.
 
 ## ADR-021 — A rewrite is blocked by new errors, not by new style hints
 
@@ -351,8 +354,9 @@ unvalidated text while making partial results usable.
 
 **Consequences:** a check can show fewer hints than the model proposed. A new
 style hint may appear as a normal LanguageTool underline after accepting an AI
-suggestion; that is visible, not silent. The guard costs up to `N + 2`
-LanguageTool calls only when the combined set fails validation.
+suggestion; that is visible, not silent. The guard costs `2 + N` LanguageTool
+calls only when the combined set fails validation; the `N` per-change checks
+run concurrently, so the extra wall-clock time stays close to two round trips.
 
 ## ADR-020 - Chunk long text on paragraph boundaries; score with map + reduce
 
@@ -469,6 +473,36 @@ at the token cap is retried once with twice the budget, up to 65536.
 because no OpenAI-compatible endpoint advertises support for it; servers that
 ignore the field simply behave as before. Every fallback is a `400`-only retry,
 so successful calls stay at one request.
+
+## ADR-025 — Audit hardening: immutable editor state, honest caches, atomic swaps
+
+**Status:** accepted
+
+**Context:** a full-repository audit found three classes of problems that would
+be hard to diagnose in normal use: a CodeMirror state field mutated its previous
+value, the hover dictionary remembered an offline gateway as "word not found",
+and the wordbook wrote German entries and aliases in two separate replaces.
+The same audit found the plugin unit tests were never run in CI, the dev script
+pointed at an untracked local file, and per-change rewrite checks paid one
+language-tool round trip each.
+
+**Decision:** editor state fields return a fresh value instead of mutating the
+input, as CodeMirror requires. The hover cache stores only a clean `200`
+answer; network errors are retried on the next hover. German entries and alias
+rows share one gzip, replaced with one `os.replace`, with a legacy alias file
+read as a fallback. Rewrite per-change checks run concurrently. The
+auto-check trigger is a pure exported function with a regression test, and CI
+runs `npm run test:ai` after build and lint. `npm run dev` uses the tracked
+esbuild config. The plugin's ten-entry detection cache uses a plain `Map`
+instead of `quick-lru`. Hover reads the frontmatter boundary from Obsidian's
+metadata cache, not from a full document copy.
+
+**Consequences:** one less bundled dependency and one less on-disk dictionary
+file per pair; a failed hover recovers without restarting Obsidian. The
+wordbook loader must tolerate alias rows in the entries file and keep the
+legacy fallback until users rebuild. Per-change checks now issue several
+concurrent LanguageTool requests; the local service handles this, but a remote
+LanguageTool with a low rate limit would need the sequential path back.
 
 ## Phase 0 findings
 

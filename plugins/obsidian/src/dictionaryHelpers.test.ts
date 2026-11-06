@@ -26,6 +26,9 @@ const withFrontmatter = "---\ntags: [a]\n---\nDer Text.";
 equal(frontmatterEnd(withFrontmatter), withFrontmatter.indexOf("Der"));
 equal(frontmatterEnd("Der Text."), 0);
 equal(frontmatterEnd("---\nunclosed"), 0);
+// A note that ends exactly on the closing fence has no trailing newline.
+const noTrailingNewline = "---\ntags: [a]\n---";
+equal(frontmatterEnd(noTrailingNewline), noTrailingNewline.length);
 
 // Code, links, and URLs are skipped.
 equal(isSkippedNode("inline-code"), true);

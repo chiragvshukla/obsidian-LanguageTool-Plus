@@ -230,12 +230,7 @@ def kaikki_aliases(entry: dict[str, Any]) -> Iterator[dict[str, str]]:
     for form in entry.get("forms") or []:
         text = str(form.get("form") or "").strip()
         tags = set(form.get("tags") or [])
-        if (
-            not text
-            or text == word
-            or tags & _FORM_JUNK
-            or _OUT_OF_SCOPE_FORM.search(text)
-        ):
+        if not text or text == word or tags & _FORM_JUNK or _OUT_OF_SCOPE_FORM.search(text):
             continue
         yield {"a": text, "l": word}
     for sense in entry.get("senses") or []:
@@ -246,14 +241,13 @@ def kaikki_aliases(entry: dict[str, Any]) -> Iterator[dict[str, str]]:
 
 
 def _build_kaikki(source: Path, directory: Path) -> None:
+    # Entries and German aliases share one file, so one atomic replace switches
+    # both at once. A crash can never leave them from different builds.
     entries = directory / "de-de.entries.jsonl.gz"
-    aliases = directory / "de.aliases.jsonl.gz"
     entries_tmp = entries.with_name(entries.name + ".tmp")
-    aliases_tmp = aliases.with_name(aliases.name + ".tmp")
     with (
         gzip.open(source, "rt", encoding="utf-8") as handle,
-        gzip.open(entries_tmp, "wt", encoding="utf-8") as out_entries,
-        gzip.open(aliases_tmp, "wt", encoding="utf-8") as out_aliases,
+        gzip.open(entries_tmp, "wt", encoding="utf-8") as out,
     ):
         for line in handle:
             try:
@@ -262,20 +256,19 @@ def _build_kaikki(source: Path, directory: Path) -> None:
                 continue
             item = kaikki_entry(raw)
             if item is not None:
-                out_entries.write(json.dumps(item, ensure_ascii=False) + "\n")
+                out.write(json.dumps(item, ensure_ascii=False) + "\n")
             for alias in kaikki_aliases(raw):
-                out_aliases.write(json.dumps(alias, ensure_ascii=False) + "\n")
+                out.write(json.dumps(alias, ensure_ascii=False) + "\n")
     os.replace(entries_tmp, entries)
-    os.replace(aliases_tmp, aliases)
+    # Older installs kept aliases in a separate file; drop it after the swap.
+    (directory / "de.aliases.jsonl.gz").unlink(missing_ok=True)
 
 
 def _write_sources(directory: Path, sources: dict[str, Any]) -> None:
     """Replace SOURCES.json in one step so a crash never leaves half of it."""
     target = directory / "SOURCES.json"
     temp = target.with_name(target.name + ".tmp")
-    temp.write_text(
-        json.dumps(sources, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
-    )
+    temp.write_text(json.dumps(sources, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     os.replace(temp, target)
 
 

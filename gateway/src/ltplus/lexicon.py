@@ -96,6 +96,7 @@ def make_match(
     rule_id: str,
     message: str,
     replacement: str | None = None,
+    offset_utf16: int | None = None,
 ) -> dict[str, object]:
     """Build one LanguageTool-shaped match at a text span."""
     before = max(0, start - 30)
@@ -105,7 +106,7 @@ def make_match(
         "message": message,
         "shortMessage": "",
         "replacements": [{"value": replacement}] if replacement else [],
-        "offset": _utf16_len(text[:start]),
+        "offset": offset_utf16 if offset_utf16 is not None else _utf16_len(text[:start]),
         "length": _utf16_len(text[start:end]),
         "context": {
             "text": context,
@@ -128,14 +129,36 @@ def synthetic_matches(
     terms: list[LexiconTerm], text: str, language: str, mode_id: str
 ) -> list[dict[str, object]]:
     """Build LanguageTool-shaped matches for every rule that applies."""
+    applicable = [term for term in terms if applies(term, language, mode_id)]
+    if not applicable:
+        return []
+    offsets = _utf16_prefix_offsets(text)
     matches: list[dict[str, object]] = []
-    for term in terms:
-        if not applies(term, language, mode_id):
-            continue
+    for term in applicable:
         for found in term._compiled.finditer(text):
             start, end = found.span()
-            matches.append(make_match(text, start, end, term.id, term.message, term.replacement))
+            matches.append(
+                make_match(
+                    text,
+                    start,
+                    end,
+                    term.id,
+                    term.message,
+                    term.replacement,
+                    offset_utf16=offsets[start],
+                )
+            )
     return matches
+
+
+def _utf16_prefix_offsets(value: str) -> list[int]:
+    """UTF-16 offset of every code-point boundary, computed in one pass."""
+    offsets = [0] * (len(value) + 1)
+    total = 0
+    for index, char in enumerate(value):
+        total += 2 if ord(char) > 0xFFFF else 1
+        offsets[index + 1] = total
+    return offsets
 
 
 def _utf16_len(value: str) -> int:

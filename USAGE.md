@@ -142,12 +142,16 @@ npm run build
 ```
 
 `npm run build` type-checks and writes `main.js`. The file is a gitignored
-build artifact. Optional checks:
+build artifact. `npm run dev` runs the same config in watch mode and rebuilds on
+every change; leave it running while you edit. Optional checks:
 
 ```powershell
-npm run test:ai     # self-check for AI match mapping and paragraph bounds
+npm run test:ai     # pure plugin units: match mapping, paragraph bounds, auto-check trigger
 npm run lint
 ```
+
+CI runs `npm run test:ai` after build and lint, so a broken helper cannot pass
+the plugin job.
 
 ## 6. Install the plugin in Obsidian
 
@@ -173,14 +177,18 @@ Configure the plugin under **Settings → LanguageTool Plus**:
 - **Language:** German, English, or automatic detection.
 - **Writing mode:** `neutral`, `formal`, `casual`, `academic`, or `business`.
 - **Enable AI features:** off by default. Required for rewrites and AI checks.
+- **AI base URL / API key / model / max response tokens / reasoning effort:**
+  the endpoint settings from section 4. The key is stored in SecretStorage; an
+  empty base URL or model keeps AI off.
 - **AI grammar / style / vocabulary:** which suggestions the model may return,
   all on by default. Turn one off to skip that kind of hint everywhere. They
   are disabled while **Enable AI features** is off and keep their values for
   when it is switched back on.
 - **AI auto-check current sentence:** optional, off by default. Waits 4
-  seconds after typing, then checks the sentence around the cursor. The rest of
-  the paragraph is sent as read-only context, so the advice fits the sentence;
-  suggestions still cover only the checked sentence.
+  seconds after typing or moving the cursor, then checks the sentence around
+  the cursor. The rest of the paragraph is sent as read-only context, so the
+  advice fits the sentence; suggestions still cover only the checked sentence.
+  Selecting text cancels a pending check.
 - The status-bar **Aa** icon and the ribbon icon open the same menu: check the
   document, switch writing mode, switch the dictionary pair, run the AI
   actions, toggle automatic checking, and clear suggestions. The AI entries
@@ -205,8 +213,8 @@ possibly credentials.
 - AI commands (require **Enable AI features**):
   - **Rewrite selection with AI** — rewrites and highlights changed spans for
     review.
-  - **Check selection with AI** — correctness pass using `neutral`, shown as
-    normal underlines.
+  - **Check selection with AI** — uses the note's resolved writing mode and
+    shows the model's changes as normal underlines.
   - **Check current paragraph with AI** - same pass on the paragraph around the
     cursor.
   - **Check whole document with AI** — splits the note into sections and checks
@@ -250,7 +258,10 @@ gateway\.venv\Scripts\python.exe scripts\build_dictionary.py
 After that, hover a word for half a second. The tooltip shows the headword,
 article and part of speech, and up to three senses. Inflected forms resolve to
 their base form (`Häuser → Haus`). Code, links, URLs, and frontmatter are
-skipped, and a miss stays silent. Lookup never calls the LLM.
+skipped, and a miss stays silent. Lookup never calls the LLM. Successful
+lookups are cached for the session; a failed or offline lookup is not cached,
+so starting the gateway later makes the next hover work without restarting
+Obsidian.
 
 ## 8. Update
 
@@ -298,7 +309,7 @@ The gateway suite mocks LanguageTool and the LLM; it needs neither running.
 | Plugin says it cannot fetch languages | Endpoint is not the gateway, or it includes `/v2`. Use `http://127.0.0.1:8077`. |
 | No underlines in code, math, or frontmatter | By design; those regions are skipped. |
 | LT checks work but AI does nothing | AI features are off, no LLM is reachable, or the text is too long for one automatic pass (2,000 characters). |
-| AI auto-check seems idle | It runs 4 seconds after the last edit and only while the editor has focus. Use **Check current paragraph with AI** to test immediately. |
+| AI auto-check seems idle | It runs 4 seconds after the last edit or cursor move and only while the editor has focus. Use **Check current paragraph with AI** to test immediately. |
 | Port already in use | Stop the old gateway/container. The defaults are `8010` for LanguageTool and `8077` for the gateway. |
 | Container is unhealthy | `docker compose logs languagetool`; wait for the first start, then check memory limits. |
 
