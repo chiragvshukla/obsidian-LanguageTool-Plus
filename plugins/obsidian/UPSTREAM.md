@@ -19,16 +19,22 @@ unmodified upstream files except where listed below. The upstream `test/` and
 
 ## Local modifications
 
-1. **AI switch and rewrite command**
-   - `src/SettingsTab.ts`: added `enableAIFeatures` (default `false`) and
-     `writingMode` (default `neutral`) to the settings, plus a "Writing"
-     section and an "AI features" section. `WRITING_MODES`/`isWritingMode`
-     are exported for validation.
+1. **AI switch, rewrite, and AI checking**
+   - `src/SettingsTab.ts`: added `enableAIFeatures` (default `false`),
+     `aiAutoCheck` (default `false`), and `writingMode` (default `neutral`) to
+     the settings, plus a "Writing" section and an "AI features" section.
+     `WRITING_MODES`/`isWritingMode` are exported for validation.
    - `src/rewrite.ts`: new. Calls `POST {serverUrl}/rewrite` on the gateway and
-     shows the result in a review modal.
-   - `src/index.ts`: added the "Rewrite selection with AI" command. It is
-     hidden unless `enableAIFeatures` is on and the editor has a non-empty
-     selection.
+     shows the result in a review modal, with changed spans highlighted.
+   - `src/aiCheck.ts`: new. Converts validated rewrite changes into
+     LanguageTool-shaped matches and finds the paragraph around the cursor.
+   - `src/index.ts`: added "Rewrite selection with AI" and "Check selection
+     with AI". Both are hidden unless `enableAIFeatures` is on and the editor
+     has a non-empty selection. The check command always uses `neutral`.
+   - `src/cm6/buildAutoCheckHandler.ts`: optional 10-second paragraph check
+     when `aiAutoCheck` is on; the slow model pass never delays LT checks.
+   - `src/cm6/underlineStateField.ts`: `clearAIUnderlinesInRange`, so a new AI
+     pass replaces only its own underlines.
 
 2. **Writing modes on checks**
    - `src/api.ts`: sends `writing_mode` on `/v2/check` when `urlMode` is

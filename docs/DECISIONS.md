@@ -210,6 +210,32 @@ heuristic; `shortcut: a lone Sie is ambiguous, upgrade to a tagger if false
 alarms matter.` Terminology notices reuse the term's rule id, so disabling the
 term disables both its per-occurrence and its consistency match.
 
+## ADR-015 — AI checks are explicit, with opt-in paragraph auto-check
+
+**Status:** accepted
+
+**Context:** LanguageTool misses German gender and case agreement in ambiguous
+forms (`Der Mädchen`, `Der Frau`, `Der Bundeskanzlerin`). The local model fixes
+these, but a rewrite replaces the whole selection and gives no inline review.
+Running the model from `/v2/check` would make deterministic, millisecond checks
+depend on a slow, stochastic service.
+
+**Decision:** keep `/v2/check` LLM-free. Reuse `POST /rewrite` for an explicit
+"Check selection with AI" command that always sends `neutral`, converts each
+validated change into an `AI_GRAMMAR` match, and skips spans that overlap a
+deterministic LT underline. Add a separate, default-off "AI auto-check current
+paragraph" setting: after 10 seconds without typing it checks at most 2,000
+characters around the cursor, discards stale results, and redraws only its own
+underlines. Rewrite changes carry source `offset`/`length`, which also drive
+changed-span highlighting in the review modal.
+
+**Consequences:** AI hints look and behave like normal LT suggestions, including
+accept, ignore, and jump. Auto-check can spend a request on a paragraph the
+user has left, and the model can flag correct text; that is why it is opt-in
+and scoped. Whole-document checking and paragraph chunking remain deferred.
+`shortcut: auto-check is one paragraph and 2,000 characters, add chunking if
+whole-note AI checking becomes a use case.`
+
 ## Phase 0 findings
 
 - LanguageTool: prebuilt image + bind-mounted `grammar_custom.xml` works; the

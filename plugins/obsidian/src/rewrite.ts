@@ -5,11 +5,13 @@ interface RewriteErrorBody {
   error?: { message?: string };
 }
 
-interface RewriteChange {
+export interface RewriteChange {
   original: string;
   replacement: string;
   category?: string;
   explanation?: string;
+  offset?: number;
+  length?: number;
 }
 
 interface RewriteResponseBody {
@@ -84,7 +86,7 @@ export class RewriteModal extends Modal {
     contentEl.createEl("h3", { text: "Original" });
     contentEl.createEl("pre", { text: this.original });
     contentEl.createEl("h3", { text: "Rewritten" });
-    contentEl.createEl("pre", { text: this.rewritten });
+    this.renderRewritten(contentEl);
 
     if (this.changes.length > 0) {
       contentEl.createEl("h3", { text: "Changes" });
@@ -111,6 +113,81 @@ export class RewriteModal extends Modal {
       .addButton(button =>
         button.setButtonText("Cancel").onClick(() => this.close())
       );
+  }
+
+  /**
+   * Rebuild the rewritten text with changed spans marked. The gateway sends
+   * source offsets; if they are missing or do not line up, show plain text
+   * rather than a misleading highlight.
+   */
+  private renderRewritten(container: HTMLElement) {
+    const pre = container.createEl("pre");
+    const spans: { offset: number; length: number; change: RewriteChange }[] = [];
+
+    let cursor = 0;
+    for (const change of this.changes) {
+      let offset = change.offset;
+      let length = change.length;
+      if (
+        typeof offset !== "number" ||
+        typeof length !== "number" ||
+        this.original.slice(offset, offset + length) !== change.original
+      ) {
+        offset = this.original.indexOf(change.original, cursor);
+        length = change.original.length;
+      }
+      if (
+        offset < cursor ||
+        length <= 0 ||
+        offset + length > this.original.length ||
+        this.original.slice(offset, offset + length) !== change.original
+      ) {
+        pre.setText(this.rewritten);
+        return;
+      }
+      spans.push({ offset, length, change });
+      cursor = offset + length;
+    }
+
+    let rebuilt = "";
+    cursor = 0;
+    for (const { offset, length, change } of spans) {
+      rebuilt += this.original.slice(cursor, offset) + change.replacement;
+      cursor = offset + length;
+    }
+    rebuilt += this.original.slice(cursor);
+
+    if (rebuilt !== this.rewritten) {
+      pre.setText(this.rewritten);
+      return;
+    }
+
+    cursor = 0;
+    for (const { offset, length, change } of spans) {
+      if (offset > cursor) {
+        pre.appendText(this.original.slice(cursor, offset));
+      }
+      if (change.replacement) {
+        const mark = pre.createEl("mark", {
+          cls: "lt-rewrite-change",
+          text: change.replacement
+        });
+        if (change.explanation) {
+          mark.setAttribute("title", change.explanation);
+        }
+      } else {
+        // Nothing remains to mark, so show a small display-only marker.
+        const marker = pre.createSpan({
+          cls: "lt-rewrite-deletion",
+          text: "removed"
+        });
+        if (change.explanation) {
+          marker.setAttribute("title", change.explanation);
+        }
+      }
+      cursor = offset + length;
+    }
+    pre.appendText(this.original.slice(cursor));
   }
 
   onClose() {

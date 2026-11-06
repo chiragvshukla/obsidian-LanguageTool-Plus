@@ -58,14 +58,21 @@ Response:
       "original": "Tset",
       "replacement": "Test",
       "category": "grammar",
-      "explanation": "Tippfehler"
+      "explanation": "Tippfehler",
+      "offset": 12,
+      "length": 4
     }
   ]
 }
 ```
 
+`offset` and `length` locate the change in the original text. They let the
+plugin highlight changed spans and turn a change into an inline suggestion
+without searching for the string again.
+
 Changes are applied by the gateway, in order, to produce `rewritten`. The
-plugin only needs `rewritten`; `changes` exist for review UI.
+plugin uses `rewritten` for the rewrite modal and `changes` for review,
+highlighting, and inline AI suggestions.
 
 ## Prompts
 

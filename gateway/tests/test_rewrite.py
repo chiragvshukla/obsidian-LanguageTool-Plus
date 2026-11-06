@@ -101,9 +101,26 @@ def test_rewrite_applies_changes(client: TestClient, llm: FakeLLM) -> None:
                 "replacement": "war",
                 "category": "style",
                 "explanation": "test",
+                "offset": 4,
+                "length": 3,
             }
         ],
     }
+
+
+@respx.mock
+def test_rewrite_reports_source_offsets_for_repeated_spans(
+    client: TestClient, llm: FakeLLM
+) -> None:
+    llm.replies = [completion(("ist", "war"), ("ist", "bleibt"))]
+    respx.post(CHECK_URL).mock(return_value=httpx.Response(200, json={"matches": []}))
+
+    response = post(client, text="Das ist gut, das ist schlecht.")
+
+    assert response.status_code == 200
+    changes = response.json()["changes"]
+    assert [(change["offset"], change["length"]) for change in changes] == [(4, 3), (17, 3)]
+    assert response.json()["rewritten"] == "Das war gut, das bleibt schlecht."
 
 
 @respx.mock

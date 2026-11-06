@@ -173,25 +173,31 @@ async def _generate(
     return response.choices[0].message.content or ""
 
 
-def _apply_changes(text: str, changes: list[LLMChange]) -> str:
-    """Apply ordered, non-overlapping changes or raise."""
-    result = text
+def _apply_changes(text: str, changes: list[LLMChange]) -> tuple[str, list[tuple[int, int]]]:
+    """Apply ordered, non-overlapping changes and report their source spans."""
+    parts: list[str] = []
+    spans: list[tuple[int, int]] = []
     cursor = 0
     for change in changes:
-        index = result.find(change.original, cursor)
+        index = text.find(change.original, cursor)
         if index < 0:
             raise ValidationFailure("a reported change does not match the source text")
-        result = result[:index] + change.replacement + result[index + len(change.original) :]
-        cursor = index + len(change.replacement)
-    return result
+        parts.append(text[cursor:index])
+        parts.append(change.replacement)
+        spans.append((index, len(change.original)))
+        cursor = index + len(change.original)
+    parts.append(text[cursor:])
+    return "".join(parts), spans
 
 
 def _protected_spans(text: str) -> Counter[str]:
     return Counter(_PROTECTED.findall(text))
 
 
-def _validate_output(text: str, payload: LLMOutput) -> tuple[str, list[LLMChange]]:
-    rewritten = _apply_changes(text, payload.changes)
+def _validate_output(
+    text: str, payload: LLMOutput
+) -> tuple[str, list[LLMChange], list[tuple[int, int]]]:
+    rewritten, spans = _apply_changes(text, payload.changes)
 
     ratio = len(rewritten) / len(text)
     if not MIN_LENGTH_RATIO <= ratio <= MAX_LENGTH_RATIO:
@@ -200,7 +206,7 @@ def _validate_output(text: str, payload: LLMOutput) -> tuple[str, list[LLMChange
     if _protected_spans(text) != _protected_spans(rewritten):
         raise ValidationFailure("numbers, links, or code changed")
 
-    return rewritten, payload.changes
+    return rewritten, payload.changes, spans
 
 
 async def _match_ids(lt: httpx.AsyncClient, language: str, text: str) -> set[str]:
@@ -263,7 +269,7 @@ async def rewrite(request: Request) -> Response:
         return JSONResponse(cached)
 
     client: AsyncOpenAI = request.app.state.llm
-    accepted: tuple[str, list[LLMChange]] | None = None
+    accepted: tuple[str, list[LLMChange], list[tuple[int, int]]] | None = None
     last_problem = ""
     for strict in (False, True):
         try:
@@ -287,7 +293,7 @@ async def rewrite(request: Request) -> Response:
 
         try:
             parsed = LLMOutput.model_validate(json.loads(content))
-            rewritten, changes = _validate_output(payload.text, parsed)
+            rewritten, changes, spans = _validate_output(payload.text, parsed)
         except (json.JSONDecodeError, ValidationError):
             last_problem = "the response was not valid JSON"
             continue
@@ -302,19 +308,22 @@ async def rewrite(request: Request) -> Response:
         if new_rules:
             last_problem = "the rewrite added LanguageTool errors: " + ", ".join(sorted(new_rules))
             continue
-        accepted = (rewritten, changes)
+        accepted = (rewritten, changes, spans)
         break
 
     if accepted is None:
         logger.warning("rewrite rejected: %s", last_problem)
         return _error(502, "llm_validation_failed", last_problem)
 
-    rewritten, changes = accepted
+    rewritten, changes, spans = accepted
 
     result = {
         "original": payload.text,
         "rewritten": rewritten,
-        "changes": [change.model_dump() for change in changes],
+        "changes": [
+            {**change.model_dump(), "offset": offset, "length": length}
+            for change, (offset, length) in zip(changes, spans, strict=True)
+        ],
     }
     cache.put(key, result)
     return JSONResponse(result)

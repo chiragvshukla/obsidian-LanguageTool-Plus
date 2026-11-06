@@ -70,6 +70,7 @@ export interface LanguageToolPluginSettings {
 
   // AI features are opt-in. Every AI command checks this flag first.
   enableAIFeatures?: boolean;
+  aiAutoCheck?: boolean;
   writingMode?: WritingMode;
 }
 
@@ -102,6 +103,7 @@ export const DEFAULT_SETTINGS: LanguageToolPluginSettings = {
   pickyMode: false,
 
   enableAIFeatures: false,
+  aiAutoCheck: false,
   writingMode: "neutral"
 };
 
@@ -793,6 +795,21 @@ export class LanguageToolSettingsTab extends PluginSettingTab {
                 .setValue(this.plugin.settings.enableAIFeatures ?? false)
                 .onChange(async value => {
                   this.plugin.settings.enableAIFeatures = value;
+                  await this.plugin.saveSettings();
+                });
+            });
+          }
+        },
+        {
+          name: "AI auto-check current paragraph",
+          desc:
+            "After 10 seconds without typing, check the paragraph around the cursor. Off by default; AI features must be enabled. LT checks still run instantly.",
+          render: setting => {
+            setting.addToggle(component => {
+              component
+                .setValue(this.plugin.settings.aiAutoCheck ?? false)
+                .onChange(async value => {
+                  this.plugin.settings.aiAutoCheck = value;
                   await this.plugin.saveSettings();
                 });
             });

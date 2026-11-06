@@ -13,12 +13,14 @@ It combines three open parts:
   default; any compatible endpoint works.
 
 The Obsidian plugin is vendored under `plugins/obsidian/` with an "Enable AI
-features" switch (off by default) and a rewrite command. The upstream plugin
-also works against the gateway in pass-through mode.
+features" switch (off by default), a rewrite command, and a selection-scoped AI
+check that reuses the existing underlines. The upstream plugin also works
+against the gateway in pass-through mode.
 
-> **Status:** Phase 3 plus the plugin fork's AI switch and rewrite command. The
+> **Status:** Phase 3 plus the plugin fork's AI rewrite and AI check. The
 > gateway proxies `/v2/check` and `/v2/languages`, applies writing modes, and
-> serves `POST /rewrite`. Inline AI suggestions follow `docs/PLAN.md`.
+> serves `POST /rewrite`. Whole-document inline AI suggestions remain deferred;
+> see `docs/PLAN.md`.
 
 ## Requirements
 
@@ -63,9 +65,11 @@ In Obsidian, install the plugin from `plugins/obsidian/` (see
 `plugins/obsidian/UPSTREAM.md` for the build) and set its endpoint to
 `http://127.0.0.1:8077` (the plugin appends `/v2` itself). Port `8010` is
 LanguageTool directly and does not apply writing modes. Enable "AI features"
-in the plugin settings to unlock "Rewrite selection with AI". The "Writing
-mode" setting applies to checks and rewrites; a note can override it with
-`lt-mode` frontmatter.
+in the plugin settings to unlock "Rewrite selection with AI" and "Check
+selection with AI"; the latter shows model changes as inline suggestions. An
+optional "AI auto-check current paragraph" setting checks after a 10-second
+pause. The "Writing mode" setting applies to checks and rewrites; a note can
+override it with `lt-mode` frontmatter.
 
 ## Configuration
 

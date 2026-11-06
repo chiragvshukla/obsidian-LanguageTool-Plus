@@ -60,7 +60,8 @@ There is no database.
 ### Obsidian plugin
 
 - Upstream plugin works unmodified against the gateway.
-- Vendored fork (later phase) adds `lt-mode` frontmatter and a rewrite command.
+- Vendored fork adds `lt-mode` frontmatter, AI rewrite, and selection-scoped
+  AI checking that renders validated changes as normal underlines.
 - The plugin sends **annotated JSON** in `data`, not plain text. The gateway
   must forward it unchanged in pass-through mode.
 
@@ -80,8 +81,9 @@ There is no database.
      (`consistency.py`).
 6. Gateway returns LanguageTool-shaped JSON.
 
-LLM suggestions are never merged into the inline path in the first
-implementation. They are explicit rewrite actions.
+The gateway's inline path never calls the LLM. The plugin may take a model
+result from `POST /rewrite` and render it as underlines for an explicit
+selection check; those matches never pass through `/v2/check`.
 
 ## Request flow (rewrite)
 

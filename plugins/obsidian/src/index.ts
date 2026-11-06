@@ -34,13 +34,15 @@ import { buildUnderlineExtension } from "./cm6/underlineExtension";
 import {
   UnderlineEffect,
   addUnderline,
+  clearAIUnderlinesInRange,
   clearUnderlines,
   clearUnderlinesInRange,
   ignoreUnderline,
   underlineField
 } from "./cm6/underlineStateField";
 import { addWordToDictionaryWithUndo } from "./cm6/dictionaryAction";
-import { requestRewrite, RewriteModal } from "./rewrite";
+import { requestRewrite, RewriteChange, RewriteModal } from "./rewrite";
+import { AI_AUTO_MAX_CHARS, AI_RULE_ID, changesToMatches, paragraphAt } from "./aiCheck";
 
 // Default SecretStorage secret name used when migrating an existing plaintext
 // key. Secret names must be lowercase alphanumeric with optional dashes.
@@ -97,6 +99,8 @@ export default class LanguageToolPlugin extends Plugin {
 
   private isloading = false;
   private ribbonIcon: HTMLElement | null = null;
+  // Discards an automatic check when a newer one starts.
+  private aiCheckGeneration = 0;
 
   public async onload() {
     // Settings
@@ -360,6 +364,24 @@ export default class LanguageToolPlugin extends Plugin {
         return true;
       }
     });
+
+    this.addCommand({
+      id: "ltai-check-selection",
+      name: "Check selection with AI",
+      editorCheckCallback: (checking, editor) => {
+        if (!this.settings.enableAIFeatures) {
+          return false;
+        }
+        if (checking) {
+          return editor.getSelection().trim().length > 0;
+        }
+        this.checkSelectionWithAI(editor).catch(e => {
+          console.error(e);
+          new Notice(e instanceof Error ? e.message : String(e), 8000);
+        });
+        return true;
+      }
+    });
   }
 
   /**
@@ -410,6 +432,142 @@ export default class LanguageToolPlugin extends Plugin {
     new RewriteModal(this.app, text, rewritten, changes, value => {
       editor.replaceSelection(value);
     }).open();
+  }
+
+  /** Check the selection and show the model's changes as normal suggestions. */
+  private async checkSelectionWithAI(editor: Editor): Promise<void> {
+    const text = editor.getSelection();
+    const start = Math.min(
+      editor.posToOffset(editor.getCursor("from")),
+      editor.posToOffset(editor.getCursor("to"))
+    );
+    const language = await this.getRewriteLanguage(text);
+    const { changes } = await requestRewrite(
+      this.settings,
+      text,
+      language,
+      "neutral"
+    );
+
+    const view = editorToCodeMirror(editor);
+    if (view.state.doc.sliceString(start, start + text.length) !== text) {
+      new Notice("AI check discarded: the note changed while checking");
+      return;
+    }
+
+    const count = this.addAIUnderlines(view, start, text, changes);
+    let message = "AI found no issues";
+    if (count > 0) {
+      message = `AI found ${count} suggestion${count === 1 ? "" : "s"}`;
+    } else if (changes.length > 0) {
+      message = "AI suggestions could not be shown inline";
+    }
+    new Notice(message, 4000);
+  }
+
+  /**
+   * Automatic check for the paragraph around the cursor. Called by the
+   * debounced handler; it fails silently so typing is never interrupted.
+   */
+  public async checkParagraphWithAI(
+    view: EditorView,
+    pos: number
+  ): Promise<void> {
+    if (
+      !this.settings.enableAIFeatures ||
+      !this.settings.aiAutoCheck ||
+      !view.hasFocus ||
+      !view.state.selection.main.empty
+    ) {
+      return;
+    }
+
+    const file = this.app.workspace.getActiveFile();
+    const frontmatterEnd = file
+      ? this.app.metadataCache.getFileCache(file)?.frontmatterPosition?.end
+          .offset
+      : undefined;
+    if (frontmatterEnd !== undefined && pos <= frontmatterEnd) {
+      return;
+    }
+
+    const paragraph = paragraphAt(view.state.doc, pos);
+    if (
+      !paragraph ||
+      paragraph.text.trim().length < 8 ||
+      paragraph.text.length > AI_AUTO_MAX_CHARS
+    ) {
+      return;
+    }
+
+    const generation = ++this.aiCheckGeneration;
+    const language = await this.getRewriteLanguage(paragraph.text);
+    if (generation !== this.aiCheckGeneration) {
+      return;
+    }
+
+    let changes: RewriteChange[];
+    try {
+      ({ changes } = await requestRewrite(
+        this.settings,
+        paragraph.text,
+        language,
+        "neutral"
+      ));
+    } catch (e) {
+      console.error(e);
+      return;
+    }
+
+    if (
+      generation !== this.aiCheckGeneration ||
+      !this.settings.enableAIFeatures ||
+      !this.settings.aiAutoCheck ||
+      view.state.doc.sliceString(paragraph.from, paragraph.to) !==
+        paragraph.text
+    ) {
+      return;
+    }
+
+    this.addAIUnderlines(view, paragraph.from, paragraph.text, changes);
+  }
+
+  /** Draw AI matches through the existing underline, popover, and accept UI. */
+  private addAIUnderlines(
+    view: EditorView,
+    baseOffset: number,
+    text: string,
+    changes: RewriteChange[]
+  ): number {
+    const matches = changesToMatches(baseOffset, text, changes);
+    const occupied: { from: number; to: number }[] = [];
+    view.state
+      .field(underlineField)
+      .between(baseOffset, baseOffset + text.length, (from, to, value) => {
+        const spec = value.spec as { match?: MatchesEntity } | undefined;
+        if (spec?.match?.rule.id !== AI_RULE_ID) {
+          occupied.push({ from, to });
+        }
+      });
+
+    const effects: StateEffect<unknown>[] = [
+      clearAIUnderlinesInRange.of({
+        from: baseOffset,
+        to: baseOffset + text.length
+      })
+    ];
+    let added = 0;
+    for (const match of matches) {
+      const from = match.offset;
+      const to = from + match.length;
+      if (occupied.some(range => from < range.to && to > range.from)) {
+        continue;
+      }
+      effects.push(addUnderline.of({ from, to, match }));
+      added += 1;
+    }
+    view.dispatch({ effects });
+    return added;
   }
 
   private getApplySuggestionCommand(n: number): Command {

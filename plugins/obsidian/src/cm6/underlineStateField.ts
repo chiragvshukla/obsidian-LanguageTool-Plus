@@ -21,6 +21,10 @@ export const clearUnderlinesInRange = StateEffect.define<{
   from: number;
   to: number;
 }>();
+export const clearAIUnderlinesInRange = StateEffect.define<{
+  from: number;
+  to: number;
+}>();
 export const ignoreUnderline = StateEffect.define<{
   from: number;
   to: number;
@@ -215,6 +219,16 @@ export const underlineField = StateField.define<DecorationSet>({
         }
       } else if (e.is(clearUnderlines)) {
         underlines = Decoration.none;
+      } else if (e.is(clearAIUnderlinesInRange)) {
+        underlines = underlines.update({
+          filter: (from, to, value) => {
+            const spec = value.spec as { match?: MatchesEntity } | undefined;
+            if (spec?.match?.rule.id !== "AI_GRAMMAR") {
+              return true;
+            }
+            return filterUnderlines(from, to, e.value.from, e.value.to);
+          }
+        });
       } else if (e.is(clearUnderlinesInRange) || e.is(ignoreUnderline)) {
         underlines = underlines.update({
           filter: (from, to) =>
