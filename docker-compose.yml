@@ -7,6 +7,17 @@ services:
     image: erikvl87/languagetool:latest
     ports:
       - "127.0.0.1:8010:8010"
+    environment:
+      # Defaults are Xmx=512m and pipeline caching off. Without caching, every
+      # check builds a new JLanguageTool and reloads the German Hunspell
+      # dictionary: ~400-600 ms fixed cost per request, and OOM under parallel
+      # checks. Caching reuses pipelines per language + rule configuration.
+      # pipelinePrewarming is not used: it fills the pool with picky/query
+      # settings that never match our requests, costing 8s of startup for nothing.
+      Java_Xms: 1g
+      Java_Xmx: 2g
+      langtool_pipelineCaching: "true"
+      langtool_maxPipelinePoolSize: "4"
     volumes:
       # LanguageTool loads grammar_custom.xml from its rules directory at
       # startup when the file exists. No rebuild needed.

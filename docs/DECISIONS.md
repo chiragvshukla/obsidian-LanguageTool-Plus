@@ -143,6 +143,26 @@ A category disabled on either side is never re-enabled.
 an explicit client restriction. The rule is visible in `merge_categories` and
 covered by tests.
 
+## ADR-012 — Enable LanguageTool pipeline caching
+
+**Status:** accepted
+
+**Context:** German checks took ~600 ms each, independent of text length; even a
+text with no words cost ~400 ms. `HTTPServerConfig` defaults to
+`pipelineCaching=false`, so every request rebuilt `JLanguageTool` and reloaded
+the German speller dictionary. The image's default `-Xmx512m` also crashed the
+JVM under four parallel German checks.
+
+**Decision:** set `langtool_pipelineCaching=true`,
+`langtool_maxPipelinePoolSize=4`, `Java_Xms=1g`, `Java_Xmx=2g` in
+`docker-compose.yml`. Do not enable `pipelinePrewarming`: it fills the pool with
+picky/query settings that never match our requests and adds ~8 s of startup.
+
+**Consequences:** steady-state German checks drop to 50-70 ms and four parallel
+checks no longer crash. The first request after a container start still costs
+~4 s. Misspelled words remain slow (~0.9-1.4 s) because Hunspell generates
+suggestions; that path is unaffected by caching.
+
 ## Phase 0 findings
 
 - LanguageTool: prebuilt image + bind-mounted `grammar_custom.xml` works; the
