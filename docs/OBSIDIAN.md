@@ -78,7 +78,11 @@ are validated by the gateway before the plugin sees them.
   notice and works even when automatic checking is off.
 - **AI auto-check current sentence** is a separate, default-off toggle. After
   4 seconds without typing it checks the sentence around the cursor (at most
-  2,000 characters). The cursor is read when the pause ends, so cursor-only
+  2,000 characters). The rest of the paragraph is sent as `context_before` /
+  `context_after` (up to 1,000 characters per side) so pronouns and references
+  resolve; the model may not change or return the context, and only sentence
+  changes become underlines. The cursor is read when the pause ends, so
+  cursor-only
   updates and clicks do not cancel a pending check; any edit invalidates it.
   Failed or stale checks are dropped silently. An empty result does not erase
   existing AI underlines; only an explicit check replaces them. LT checking

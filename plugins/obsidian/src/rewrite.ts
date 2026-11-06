@@ -34,7 +34,8 @@ export async function requestRewrite(
   text: string,
   language?: string,
   mode?: string,
-  categories?: string[]
+  categories?: string[],
+  context?: { before?: string; after?: string }
 ): Promise<RewriteResult> {
   const body: Record<string, string | string[]> = {
     text,
@@ -45,6 +46,12 @@ export async function requestRewrite(
   }
   if (categories) {
     body.categories = categories;
+  }
+  if (context?.before) {
+    body.context_before = context.before;
+  }
+  if (context?.after) {
+    body.context_after = context.after;
   }
 
   const res = await requestUrl({

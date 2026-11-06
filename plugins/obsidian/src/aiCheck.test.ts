@@ -1,5 +1,5 @@
 import { Text } from "@codemirror/state";
-import { changesToMatches, isAIUnderline, paragraphAt, sentenceAt } from "./aiCheck";
+import { changesToMatches, contextAround, isAIUnderline, paragraphAt, sentenceAt } from "./aiCheck";
 
 function equal(actual: unknown, expected: unknown) {
   if (JSON.stringify(actual) !== JSON.stringify(expected)) {
@@ -96,3 +96,15 @@ const ltDecoration = { spec: { match: { rule: { id: "MORFOLOGIK_RULE_DE_DE" } } 
 equal(isAIUnderline(aiDecoration), true);
 equal(isAIUnderline(ltDecoration), false);
 equal(isAIUnderline({}), false);
+
+// Context is taken from the paragraph around the checked range and capped per
+// side, so one automatic pass cannot grow without bound.
+const contextPara = { from: 10, text: "alt. Der Satz. neu." };
+equal(contextAround(contextPara, { from: 15, text: "Der Satz." }), {
+  before: "alt. ",
+  after: " neu."
+});
+equal(contextAround(contextPara, { from: 15, text: "Der Satz." }, 3), {
+  before: "t. ",
+  after: " ne"
+});

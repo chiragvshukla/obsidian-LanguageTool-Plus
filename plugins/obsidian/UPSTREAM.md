@@ -29,8 +29,9 @@ unmodified upstream files except where listed below. The upstream `test/` and
      sending the enabled AI categories when one is switched off, and
      shows the result in a review modal, with changed spans highlighted.
    - `src/aiCheck.ts`: new. Converts validated rewrite changes into
-     LanguageTool-shaped matches, finds the paragraph around the cursor, and
-     extracts the sentence inside it for the automatic pass.
+     LanguageTool-shaped matches, finds the paragraph around the cursor,
+     extracts the sentence inside it for the automatic pass, and sends the
+     rest of the paragraph as bounded read-only context.
      `style` changes get the `STYLE` category (purple), `vocabulary` gets
      `VOCABULARY` (blue), others `GRAMMAR`.
    - `src/index.ts`: added "Rewrite selection with AI", "Check selection with

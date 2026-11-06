@@ -272,6 +272,32 @@ gateway filter trusts the label it returns. With only `grammar` enabled, wording
 suggestions are dropped rather than partially applied, and a span needing both
 kinds of fix gets only the enabled part.
 
+## ADR-017 — Automatic checks send paragraph context
+
+**Status:** accepted
+
+**Context:** a sentence checked alone loses the references that decide German
+case, gender, and register: a pronoun's antecedent, whether the note addresses
+a landlord or a friend, and the tense already established. Sending the whole
+paragraph as the rewrite target would make every sentence pay for a paragraph
+rewrite and would return changes the auto-check cannot safely place.
+
+**Decision:** `POST /rewrite` accepts optional `context_before` and
+`context_after`. They are rendered as separate, marked read-only blocks. The
+model may use them but changes are validated against `text` only, so a change
+that falls in the context fails validation and is retried. The cache key
+includes both strings, and text plus context must fit `LLM_CONTEXT_CHARS`. The
+plugin's automatic pass sends the rest of the paragraph capped at 1,000
+characters per side; the manual paragraph command and selection actions send no
+context. A test pins the context slicing.
+
+**Consequences:** the prompt grows by the surrounding paragraph, and a sentence
+repeated in different paragraphs no longer shares a cache entry. On the local
+model the measured difference was under 0.2 s for a ~90-character sentence with
+two context sentences, so the change is effectively free. Only the checked
+sentence receives underlines; clicking one still accepts a change within that
+sentence.
+
 ## Phase 0 findings
 
 - LanguageTool: prebuilt image + bind-mounted `grammar_custom.xml` works; the

@@ -74,6 +74,9 @@ class RewriteRequest(BaseModel):
     instruction: str = ""
     # Allowed change categories. None means all; an empty list means none.
     categories: list[str] | None = None
+    # Read-only surrounding text. Changes must stay inside `text`.
+    context_before: str = ""
+    context_after: str = ""
 
 
 # Categories the plugin can show. Anything else is ignored in `categories`.
@@ -86,21 +89,24 @@ CATEGORY_LABELS = {
     "vocabulary": "a word written in another language",
 }
 
+# (language, mode, instruction, text, categories, context before, context after)
+CacheKey = tuple[str, str, str, str, str, str, str]
+
 
 class RewriteCache:
     """Small in-memory LRU. Nothing is written to disk."""
 
     def __init__(self, size: int) -> None:
         self._size = max(1, size)
-        self._items: OrderedDict[tuple[str, str, str, str, str], dict[str, Any]] = OrderedDict()
+        self._items: OrderedDict[CacheKey, dict[str, Any]] = OrderedDict()
 
-    def get(self, key: tuple[str, str, str, str, str]) -> dict[str, Any] | None:
+    def get(self, key: CacheKey) -> dict[str, Any] | None:
         value = self._items.get(key)
         if value is not None:
             self._items.move_to_end(key)
         return value
 
-    def put(self, key: tuple[str, str, str, str, str], value: dict[str, Any]) -> None:
+    def put(self, key: CacheKey, value: dict[str, Any]) -> None:
         self._items[key] = value
         self._items.move_to_end(key)
         while len(self._items) > self._size:
@@ -134,9 +140,22 @@ def _error(status: int, code: str, message: str) -> JSONResponse:
 
 
 def _user_message(
-    text: str, instruction: str, categories: list[str] | None = None
+    text: str,
+    instruction: str,
+    categories: list[str] | None = None,
+    context_before: str = "",
+    context_after: str = "",
 ) -> str:
     message = f"Text to revise:\n<<<\n{text}\n>>>"
+    if context_before:
+        message += f"\n\nContext before (do not revise):\n<<<\n{context_before}\n>>>"
+    if context_after:
+        message += f"\n\nContext after (do not revise):\n<<<\n{context_after}\n>>>"
+    if context_before or context_after:
+        message += (
+            "\n\nUse the context only to understand the text. Return changes "
+            "only for the text to revise."
+        )
     if categories is not None:
         allowed = [
             f"{category} ({CATEGORY_LABELS[category]})"
@@ -186,6 +205,8 @@ async def _generate(
     temperature: float,
     strict: bool,
     categories: list[str] | None = None,
+    context_before: str = "",
+    context_after: str = "",
 ) -> str:
     """Call the endpoint once. Returns the raw message content."""
     system = prompt
@@ -193,7 +214,12 @@ async def _generate(
         system += "\n\nReturn only valid JSON. No prose, no code fences."
     messages: list[ChatCompletionMessageParam] = [
         {"role": "system", "content": system},
-        {"role": "user", "content": _user_message(text, instruction, categories)},
+        {
+            "role": "user",
+            "content": _user_message(
+                text, instruction, categories, context_before, context_after
+            ),
+        },
     ]
 
     try:
@@ -305,6 +331,15 @@ async def rewrite(request: Request) -> Response:
             "text_too_long",
             f"Text exceeds {settings.llm_context_chars} characters; select a shorter passage",
         )
+    if (
+        len(payload.text) + len(payload.context_before) + len(payload.context_after)
+        > settings.llm_context_chars
+    ):
+        return _error(
+            413,
+            "text_too_long",
+            f"Text and context exceed {settings.llm_context_chars} characters",
+        )
 
     # Nothing to ask when the client switched every category off.
     if payload.categories is not None and not payload.categories:
@@ -318,6 +353,8 @@ async def rewrite(request: Request) -> Response:
         payload.instruction,
         payload.text,
         _categories_key(payload.categories),
+        payload.context_before,
+        payload.context_after,
     )
     cache: RewriteCache = request.app.state.rewrite_cache
     cached = cache.get(key)
@@ -338,6 +375,8 @@ async def rewrite(request: Request) -> Response:
                 mode.temperature,
                 strict,
                 payload.categories,
+                payload.context_before,
+                payload.context_after,
             )
         except BadRequestError as exc:
             logger.warning("LLM rejected the request: %s", exc.status_code)

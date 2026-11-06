@@ -7,6 +7,26 @@ export const AI_RULE_ID = "AI_GRAMMAR";
 /** Longest paragraph the automatic pass sends to the model. */
 export const AI_AUTO_MAX_CHARS = 2000;
 
+/** Most context characters sent on each side of an automatic check. */
+export const AI_CONTEXT_MAX_CHARS = 1000;
+
+/**
+ * The paragraph text before and after `range`, trimmed to the nearest
+ * `limit` characters. The gateway treats it as read-only context.
+ */
+export function contextAround(
+  paragraph: { from: number; text: string },
+  range: { from: number; text: string },
+  limit = AI_CONTEXT_MAX_CHARS
+): { before: string; after: string } {
+  const start = Math.max(0, range.from - paragraph.from);
+  const end = Math.min(paragraph.text.length, start + range.text.length);
+  return {
+    before: paragraph.text.slice(Math.max(0, start - limit), start),
+    after: paragraph.text.slice(end, end + limit)
+  };
+}
+
 /** Whether a CodeMirror decoration holds one of our AI matches. */
 export function isAIUnderline(value: { spec?: unknown }): boolean {
   const spec = value.spec as

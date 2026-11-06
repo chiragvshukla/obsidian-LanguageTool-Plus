@@ -282,6 +282,45 @@ def test_rewrite_tells_the_model_which_categories_are_allowed(
 
 
 @respx.mock
+def test_rewrite_sends_context_as_read_only(client: TestClient, llm: FakeLLM) -> None:
+    llm.replies = [completion(("ist", "war"))]
+    respx.post(CHECK_URL).mock(return_value=httpx.Response(200, json={"matches": []}))
+
+    response = post(client, context_before="Vorher.", context_after="Nachher.")
+
+    assert response.status_code == 200
+    user_message = llm.last_messages[-1]["content"]
+    assert "Context before (do not revise):\n<<<\nVorher.\n>>>" in user_message
+    assert "Context after (do not revise):\n<<<\nNachher.\n>>>" in user_message
+    assert response.json()["rewritten"] == "Das war ein Test."
+    assert response.json()["original"] == "Das ist ein Test."
+
+
+@respx.mock
+def test_rewrite_rejects_a_change_from_the_context(
+    client: TestClient, llm: FakeLLM
+) -> None:
+    llm.replies = [completion(("Vorher", "Zuvor"))]
+    respx.post(CHECK_URL).mock(return_value=httpx.Response(200, json={"matches": []}))
+
+    response = post(client, context_before="Vorher.")
+
+    assert response.status_code == 502
+    assert response.json()["error"]["code"] == "llm_validation_failed"
+
+
+@respx.mock
+def test_rewrite_cache_key_includes_context(client: TestClient, llm: FakeLLM) -> None:
+    llm.replies = [completion(("ist", "war"))]
+    respx.post(CHECK_URL).mock(return_value=httpx.Response(200, json={"matches": []}))
+
+    post(client, context_before="Eins.")
+    post(client, context_before="Zwei.")
+
+    assert llm.calls == 2
+
+
+@respx.mock
 def test_rewrite_cache_key_includes_categories(
     client: TestClient, llm: FakeLLM
 ) -> None:

@@ -154,7 +154,9 @@ Configure the plugin under **Settings → LanguageTool Integration**:
 - **AI grammar / style / vocabulary:** which suggestions the model may return,
   all on by default. Turn one off to skip that kind of hint everywhere.
 - **AI auto-check current sentence:** optional, off by default. Waits 4
-  seconds after typing, then checks the sentence around the cursor.
+  seconds after typing, then checks the sentence around the cursor. The rest of
+  the paragraph is sent as read-only context, so the advice fits the sentence;
+  suggestions still cover only the checked sentence.
 - The status-bar **Aa** icon and the ribbon icon open the same menu: check the
   document, switch writing mode, run the AI actions, toggle automatic checking,
   and clear suggestions. The AI entries appear only while AI features are on.

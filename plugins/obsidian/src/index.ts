@@ -45,7 +45,7 @@ import {
 } from "./cm6/underlineStateField";
 import { addWordToDictionaryWithUndo } from "./cm6/dictionaryAction";
 import { requestRewrite, RewriteChange, RewriteModal } from "./rewrite";
-import { AI_AUTO_MAX_CHARS, changesToMatches, paragraphAt, sentenceAt } from "./aiCheck";
+import { AI_AUTO_MAX_CHARS, changesToMatches, contextAround, paragraphAt, sentenceAt } from "./aiCheck";
 import { WritingModeModal } from "./modePicker";
 
 // Default SecretStorage secret name used when migrating an existing plaintext
@@ -557,6 +557,16 @@ export default class LanguageToolPlugin extends Plugin {
     }
 
     const doc = view.state.doc;
+    // The automatic pass checks one sentence but lets the model see the whole
+    // paragraph, so pronouns and references resolve. Only sentence changes
+    // come back. The manual paragraph command needs no extra context.
+    let context: { before?: string; after?: string } | undefined;
+    if (!manual) {
+      const paragraph = paragraphAt(doc, pos);
+      if (paragraph) {
+        context = contextAround(paragraph, range);
+      }
+    }
     const generation = ++this.aiCheckGeneration;
     const language = await this.getRewriteLanguage(range.text);
     if (generation !== this.aiCheckGeneration) {
@@ -571,7 +581,8 @@ export default class LanguageToolPlugin extends Plugin {
         range.text,
         language,
         mode,
-        this.getAiCategories()
+        this.getAiCategories(),
+        context
       ));
     } catch (e) {
       console.error(e);
