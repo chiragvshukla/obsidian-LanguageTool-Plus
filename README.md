@@ -90,6 +90,21 @@ See `AGENTS.md` §5 and `docs/ARCHITECTURE.md`.
 - `docs/LLM.md` — OpenAI-compatible contract and validation
 - `docs/TESTING.md` — test strategy
 
+## Credits
+
+Built on other people's work:
+
+- **LanguageTool** and its German rules, by the LanguageTool team
+  (LGPL-2.1-or-later).
+- **LanguageTool server image**, maintained by Erikvl87
+  (`Erikvl87/docker-languagetool`, LGPL-2.1).
+- **Obsidian LanguageTool Integration**, by Clemens Ertle and contributors,
+  including Matthew Meyers (AGPL-3.0). The fork lives in `plugins/obsidian/`.
+- The MIT-licensed JavaScript libraries bundled into the plugin build.
+
+Full attribution, copyright notices, and license texts are in
+[`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
+
 ## License
 
 AGPL-3.0-or-later. See `LICENSE`.

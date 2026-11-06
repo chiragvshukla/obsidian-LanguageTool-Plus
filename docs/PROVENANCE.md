@@ -9,6 +9,8 @@ lands in the repository.
 | LanguageTool German rules | same repository | LGPL-2.1-or-later | Read at runtime | Not copied into our source |
 | German rule category IDs | `community.languagetool.org/rule/list` | LGPL-2.1-or-later | Referenced in `modes/*.yaml` | Public identifiers |
 | Obsidian LanguageTool plugin | https://github.com/Clemens-E/obsidian-languagetool-plugin | AGPL-3.0 | Vendored fork under `plugins/obsidian/` | Commit `f1817704bc0700b0313e474207762af5ab422750`; see `plugins/obsidian/UPSTREAM.md` |
+| LanguageTool Docker image | https://github.com/Erikvl87/docker-languagetool | LGPL-2.1 | Prebuilt image `erikvl87/languagetool:6.8` in `docker-compose.yml` | Not vendored; source is upstream |
+| Bundled plugin libraries | npm, see `THIRD_PARTY_NOTICES.md` | MIT | Bundled into `plugins/obsidian/main.js` by esbuild | 40 packages; notices and MIT text recorded |
 
 ## Explicitly not used
 

@@ -6,6 +6,7 @@ Vendored from
 | Item | Value |
 |---|---|
 | Upstream URL | https://github.com/Clemens-E/obsidian-languagetool-plugin |
+| Copyright | Clemens Ertle and contributors, including Matthew Meyers |
 | Commit | `f1817704bc0700b0313e474207762af5ab422750` (2026-09-05, "Release 0.4.3") |
 | License | AGPL-3.0, `LICENSE.md` |
 | Copied | 2026-11-06 |
@@ -40,9 +41,11 @@ yarn install          # or: npm install
 yarn build            # or: npm run build
 ```
 
-`main.js` is a build artifact and is ignored by git. Copy `main.js`,
-`manifest.json`, and `styles.css` into
-`<vault>/.obsidian/plugins/obsidian-languagetool-plugin/`.
+`main.js` is a build artifact and is ignored by git. It bundles 40
+MIT-licensed npm packages; their notices are in the repository-root
+`THIRD_PARTY_NOTICES.md`. Copy `main.js`, `manifest.json`, and `styles.css` into
+`<vault>/.obsidian/plugins/obsidian-languagetool-plugin/` and keep the notices
+with any build you share.
 
 ## Upstream updates
 

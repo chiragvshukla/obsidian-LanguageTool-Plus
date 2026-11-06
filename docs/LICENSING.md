@@ -15,13 +15,23 @@ run a modified version as a service, users must be able to obtain the source.
   relinking.
 - LanguageTool Closed rules are closed source. We do not copy, scrape, or
   redistribute them.
+- The container comes from https://github.com/Erikvl87/docker-languagetool
+  (LGPL-2.1), published as `erikvl87/languagetool`.
 
 ## Obsidian plugin fork
 
 - Upstream: https://github.com/Clemens-E/obsidian-languagetool-plugin
-- License: AGPL-3.0.
+- Copyright © Clemens Ertle and contributors, including Matthew Meyers.
+- License: AGPL-3.0. Upstream license text is kept at
+  `plugins/obsidian/LICENSE.md`.
 - The vendored fork remains AGPL-3.0. Keep the license and attribution.
-- Modifications are published in this repository, satisfying AGPL.
+- Modifications are published in this repository, satisfying AGPL. If the built
+  plugin is shared, include `THIRD_PARTY_NOTICES.md` and
+  `plugins/obsidian/LICENSE.md`, and offer the corresponding source (this
+  repository).
+- `plugins/obsidian/main.js` bundles MIT-licensed JavaScript packages. Their
+  copyright notices and license text are in `THIRD_PARTY_NOTICES.md`; keep that
+  file with any distributed build.
 
 ## Third-party browser extension
 
