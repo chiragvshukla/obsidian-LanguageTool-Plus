@@ -68,6 +68,7 @@ See `AGENTS.md` §5 and `docs/ARCHITECTURE.md`.
 
 - `docs/PLAN.md` — phases and acceptance criteria
 - `docs/ARCHITECTURE.md` — components and request flow
+- `docs/RULES.md` — add dictionary words, term rules, and German grammar rules
 - `docs/STANDARDS.md` — engineering standards
 - `docs/SECURITY.md` — secrets, privacy, threat model
 - `docs/LICENSING.md` — AGPL/LGPL obligations

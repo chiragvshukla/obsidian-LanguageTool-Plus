@@ -74,8 +74,8 @@ There is no database.
    `disabledCategories`, intersected with what the client sent.
 4. Gateway forwards the request to LanguageTool.
 5. Gateway filters matches:
-   - drop words in `data/dictionary/<language>.txt`,
-   - apply `rules/lexicon.yaml` term rules.
+   - drop words in `data/dictionary/<language>.txt` (read per request),
+   - apply `rules/lexicon.yaml` term rules (loaded at startup).
 6. Gateway returns LanguageTool-shaped JSON.
 
 LLM suggestions are never merged into the inline path in the first

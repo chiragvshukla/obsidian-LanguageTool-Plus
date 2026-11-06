@@ -7,6 +7,7 @@ untouched; only the mode-derived parameters are adjusted.
 
 from __future__ import annotations
 
+import json
 import logging
 from urllib.parse import parse_qs
 
@@ -15,6 +16,8 @@ from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, Response
 
 from ltplus.config import Settings
+from ltplus.dictionary import load_words
+from ltplus.lexicon import LexiconTerm, synthetic_matches
 from ltplus.models import Mode
 
 logger = logging.getLogger(__name__)
@@ -43,6 +46,79 @@ def _csv(value: str | None) -> list[str]:
     if not value:
         return []
     return [item.strip() for item in value.split(",") if item.strip()]
+
+
+def _request_text(params: dict[str, str]) -> str | None:
+    """Recover the checked text from `text` or the plugin's `data` JSON."""
+    if "text" in params:
+        return params["text"]
+
+    raw = params.get("data")
+    if not raw:
+        return None
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(data, dict):
+        return None
+
+    text = data.get("text")
+    if isinstance(text, str):
+        return text
+
+    annotation = data.get("annotation")
+    if not isinstance(annotation, list):
+        return None
+
+    parts: list[str] = []
+    for item in annotation:
+        if isinstance(item, str):
+            parts.append(item)
+        elif isinstance(item, dict) and isinstance(item.get("text"), str):
+            parts.append(item["text"])
+        else:
+            return None
+    return "".join(parts)
+
+
+def _is_known_word(match: object, utf16: bytes, words: set[str]) -> bool:
+    """True when the match covers a word from the personal dictionary."""
+    if not words or not isinstance(match, dict):
+        return False
+    offset = match.get("offset")
+    length = match.get("length")
+    if not isinstance(offset, int) or not isinstance(length, int):
+        return False
+    span = utf16[offset * 2 : (offset + length) * 2].decode("utf-16-le", "ignore")
+    return span.strip().casefold() in words
+
+
+def _offset(match: object) -> int:
+    if isinstance(match, dict):
+        offset = match.get("offset")
+        if isinstance(offset, int):
+            return offset
+    return 0
+
+
+def _allowed_terms(terms: list[LexiconTerm], params: dict[str, str]) -> list[LexiconTerm]:
+    """Drop terms the client disabled or did not enable under `enabledOnly`."""
+    disabled_categories = set(_csv(params.get("disabledCategories")))
+    disabled_rules = set(_csv(params.get("disabledRules")))
+    enabled_categories = set(_csv(params.get("enabledCategories")))
+    enabled_rules = set(_csv(params.get("enabledRules")))
+    enabled_only = params.get("enabledOnly", "").lower() == "true"
+
+    allowed: list[LexiconTerm] = []
+    for term in terms:
+        rule_id = term.id.upper()
+        if "LT_PLUS" in disabled_categories or rule_id in disabled_rules:
+            continue
+        if enabled_only and "LT_PLUS" not in enabled_categories and rule_id not in enabled_rules:
+            continue
+        allowed.append(term)
+    return allowed
 
 
 def merge_categories(
@@ -144,4 +220,25 @@ async def check(request: Request) -> Response:
     if upstream.status_code >= 500:
         logger.warning("check upstream status %s", upstream.status_code)
         return _error(502, "languagetool_error", "LanguageTool failed")
-    return _relay(upstream)
+
+    text = _request_text(params)
+    if text is None:
+        return _relay(upstream)
+
+    try:
+        payload = upstream.json()
+    except ValueError:
+        return _relay(upstream)
+    if not isinstance(payload, dict) or not isinstance(payload.get("matches"), list):
+        return _relay(upstream)
+
+    language = params["language"]
+    words = load_words(settings.dictionary_dir, language)
+    utf16 = text.encode("utf-16-le")
+    payload["matches"] = [
+        match for match in payload["matches"] if not _is_known_word(match, utf16, words)
+    ]
+    terms = _allowed_terms(request.app.state.lexicon, params)
+    payload["matches"].extend(synthetic_matches(terms, text, language, mode.id))
+    payload["matches"].sort(key=_offset)
+    return JSONResponse(payload)

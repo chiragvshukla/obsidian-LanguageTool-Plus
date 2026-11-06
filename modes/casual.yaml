@@ -7,5 +7,6 @@ disabled_categories:
   - STYLE
   - COLLOQUIALISMS
   - REDUNDANCY
+  - LT_PLUS
 prompt: prompts/de/casual.md
 temperature: 0.4

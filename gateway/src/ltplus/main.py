@@ -12,6 +12,7 @@ from fastapi import FastAPI
 from ltplus import __version__
 from ltplus.api import router
 from ltplus.config import Settings, get_settings
+from ltplus.lexicon import load_lexicon, validate_modes
 from ltplus.modes import ModeConfigError, load_modes
 
 
@@ -27,6 +28,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     modes = load_modes(settings.modes_dir)
     if settings.default_mode not in modes:
         raise ModeConfigError(f"default mode '{settings.default_mode}' is not defined")
+
+    lexicon = load_lexicon(settings.rules_dir / "lexicon.yaml")
+    validate_modes(lexicon, set(modes))
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -46,6 +50,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     app.state.settings = settings
     app.state.modes = modes
+    app.state.lexicon = lexicon
     app.include_router(router)
 
     @app.get("/healthz")
