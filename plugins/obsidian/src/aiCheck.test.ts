@@ -1,5 +1,5 @@
 import { Text } from "@codemirror/state";
-import { changesToMatches, isAIUnderline, paragraphAt } from "./aiCheck";
+import { changesToMatches, isAIUnderline, paragraphAt, sentenceAt } from "./aiCheck";
 
 function equal(actual: unknown, expected: unknown) {
   if (JSON.stringify(actual) !== JSON.stringify(expected)) {
@@ -46,6 +46,23 @@ equal(paragraph, {
   text: "second para\ncontinues"
 });
 equal(paragraphAt(doc, doc.line(2).from), null);
+
+const sentences = Text.of(["Erster Satz. Zweiter Satz! Dritter?"]);
+equal(sentenceAt(sentences, 0), {
+  from: 0,
+  to: 12,
+  text: "Erster Satz."
+});
+equal(sentenceAt(sentences, 13), {
+  from: 13,
+  to: 26,
+  text: "Zweiter Satz!"
+});
+// A cursor on the space after a sentence belongs to the next sentence.
+equal(sentenceAt(sentences, 12)?.text, "Zweiter Satz!");
+equal(sentenceAt(sentences, 34)?.text, "Dritter?");
+equal(sentenceAt(doc, doc.line(2).from), null);
+equal(sentenceAt(doc, doc.line(3).from)?.text, "second para\ncontinues");
 
 const aiDecoration = { spec: { match: { rule: { id: "AI_GRAMMAR" } } } };
 const ltDecoration = { spec: { match: { rule: { id: "MORFOLOGIK_RULE_DE_DE" } } } };

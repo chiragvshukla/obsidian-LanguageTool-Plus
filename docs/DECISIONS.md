@@ -227,24 +227,24 @@ where a deterministic LT underline already exists. The change category sets the
 underline colour (`style` purple, grammar amber) and AI underlines are dashed,
 so a phrasing suggestion is distinguishable from a grammar catch and from LT.
 Overlapping hints share one popover with a section per suggestion, so neither is
-hidden. Add a separate, default-off "AI auto-check current paragraph" setting:
-after 10 seconds without typing it checks at most 2,000 characters around the
-cursor, discards stale results, and redraws only its own underlines. Rewrite
-changes carry source `offset`/`length`, which also drive changed-span
-highlighting in the review modal.
+hidden. Add a separate, default-off "AI auto-check current sentence" setting:
+after 4 seconds without typing it checks one sentence (at most 2,000
+characters) around the cursor, discards stale results, and redraws only its own
+underlines. Rewrite changes carry source `offset`/`length`, which also drive
+changed-span highlighting in the review modal.
 
 **Consequences:** AI hints look and behave like normal LT suggestions, including
 accept, ignore, and jump. Because the check follows the note's mode, formal,
 business, and academic notes receive phrasing suggestions as well as correctness
 fixes; the category keeps their colours apart. Where both underline the same
 words, one popover lists both suggestions instead of hiding one. Auto-check can
-spend a request on a paragraph the user has left, and the model can flag correct
+spend a request on a sentence the user has left, and the model can flag correct
 text; that is why it is opt-in and scoped. Cursor-only updates do not cancel the
 debounce; the cursor is read when the pause ends. LT checks clear only their own
 underlines so they cannot erase AI hints, and an empty automatic AI result leaves
 existing hints in place. Whole-document checking and paragraph chunking remain
 deferred.
-`shortcut: auto-check is one paragraph and 2,000 characters, add chunking if
+`shortcut: auto-check is one sentence and 2,000 characters, add chunking if
 whole-note AI checking becomes a use case.`
 
 ## Phase 0 findings

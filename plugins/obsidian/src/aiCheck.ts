@@ -101,3 +101,44 @@ export function paragraphAt(
   const text = doc.sliceString(start.from, end.to);
   return text.trim() ? { from: start.from, to: end.to, text } : null;
 }
+
+/**
+ * The sentence around `pos`, bounded by the paragraph. The automatic check
+ * uses this so one request covers a sentence, not a whole paragraph.
+ * shortcut: the regex split treats "z. B." as a sentence end; use
+ * Intl.Segmenter or LanguageTool sentenceRanges if that misleads in practice.
+ */
+export function sentenceAt(
+  doc: Text,
+  pos: number
+): { from: number; to: number; text: string } | null {
+  const paragraph = paragraphAt(doc, pos);
+  if (!paragraph) {
+    return null;
+  }
+
+  const local = pos - paragraph.from;
+  const text = paragraph.text;
+  const boundary = /[.!?…]+(?=\s|$)/g;
+  let start = 0;
+  let end = text.length;
+  let match: RegExpExecArray | null;
+  while ((match = boundary.exec(text)) !== null) {
+    const after = match.index + match[0].length;
+    if (after <= local) {
+      start = after;
+      continue;
+    }
+    end = after;
+    break;
+  }
+
+  const raw = text.slice(start, end);
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    return null;
+  }
+  const leading = raw.length - raw.trimStart().length;
+  const from = paragraph.from + start + leading;
+  return { from, to: from + trimmed.length, text: trimmed };
+}

@@ -27,12 +27,13 @@ unmodified upstream files except where listed below. The upstream `test/` and
    - `src/rewrite.ts`: new. Calls `POST {serverUrl}/rewrite` on the gateway and
      shows the result in a review modal, with changed spans highlighted.
    - `src/aiCheck.ts`: new. Converts validated rewrite changes into
-     LanguageTool-shaped matches and finds the paragraph around the cursor.
+     LanguageTool-shaped matches, finds the paragraph around the cursor, and
+     extracts the sentence inside it for the automatic pass.
      `style` changes get the `STYLE` category (purple), others `GRAMMAR`.
    - `src/index.ts`: added "Rewrite selection with AI", "Check selection with
      AI", and "Check current paragraph with AI". All are hidden unless
      `enableAIFeatures` is on; the checks use the note's resolved writing mode.
-   - `src/cm6/buildAutoCheckHandler.ts`: optional 10-second paragraph check
+   - `src/cm6/buildAutoCheckHandler.ts`: optional 4-second sentence check
      when `aiAutoCheck` is on. Cursor-only updates do not cancel it; the cursor
      is read when the pause ends, and edits invalidate the result.
    - `src/cm6/underlineStateField.ts`: `clearAIUnderlinesInRange` replaces only

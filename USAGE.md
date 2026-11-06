@@ -151,8 +151,8 @@ Configure the plugin under **Settings → LanguageTool Integration**:
 - **Language:** German, English, or automatic detection.
 - **Writing mode:** `neutral`, `formal`, `casual`, `academic`, or `business`.
 - **Enable AI features:** off by default. Required for rewrites and AI checks.
-- **AI auto-check current paragraph:** optional, off by default. Waits 10
-  seconds after typing, then checks the paragraph around the cursor.
+- **AI auto-check current sentence:** optional, off by default. Waits 4
+  seconds after typing, then checks the sentence around the cursor.
 
 Do not overwrite `data.json` when updating; it holds the plugin's settings and
 possibly credentials.
@@ -226,8 +226,8 @@ The gateway suite mocks LanguageTool and the LLM; it needs neither running.
 | `/rewrite` returns `502 llm_validation_failed` | The model returned invalid JSON, changed protected text, or added new LanguageTool errors. Try again or use a stronger model. |
 | Plugin says it cannot fetch languages | Endpoint is not the gateway, or it includes `/v2`. Use `http://127.0.0.1:8077`. |
 | No underlines in code, math, or frontmatter | By design; those regions are skipped. |
-| LT checks work but AI does nothing | AI features are off, no LLM is reachable, or the paragraph is too long for one automatic pass (2,000 characters). |
-| AI auto-check seems idle | It runs 10 seconds after the last edit and only while the editor has focus. Use **Check current paragraph with AI** to test immediately. |
+| LT checks work but AI does nothing | AI features are off, no LLM is reachable, or the text is too long for one automatic pass (2,000 characters). |
+| AI auto-check seems idle | It runs 4 seconds after the last edit and only while the editor has focus. Use **Check current paragraph with AI** to test immediately. |
 | Port already in use | Stop the old gateway/container. The defaults are `8010` for LanguageTool and `8077` for the gateway. |
 | Container is unhealthy | `docker compose logs languagetool`; wait for the first start, then check memory limits. |
 

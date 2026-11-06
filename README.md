@@ -81,7 +81,7 @@ In Obsidian, install the plugin from `plugins/obsidian/` (see
 LanguageTool directly and does not apply writing modes. Enable "AI features"
 in the plugin settings to unlock "Rewrite selection with AI" and "Check
 selection with AI"; the latter shows model changes as inline suggestions. An
-optional "AI auto-check current paragraph" setting checks after a 10-second
+optional "AI auto-check current sentence" setting checks after a 4-second
 pause. The "Writing mode" setting applies to checks and rewrites; a note can
 override it with `lt-mode` frontmatter.
 

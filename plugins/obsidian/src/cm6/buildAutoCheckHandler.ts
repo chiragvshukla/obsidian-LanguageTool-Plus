@@ -4,8 +4,8 @@ import LanguageToolPlugin from "src";
 import { getDocumentAutoCheck } from "../helpers";
 
 // The model is much slower than LanguageTool, so the automatic pass waits
-// longer and checks only the paragraph around the cursor.
-const AI_AUTO_CHECK_DELAY_MS = 10_000;
+// longer and checks only the sentence around the cursor.
+const AI_AUTO_CHECK_DELAY_MS = 4_000;
 
 function shouldAutoCheck(
   plugin: LanguageToolPlugin,

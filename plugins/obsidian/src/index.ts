@@ -44,7 +44,7 @@ import {
 } from "./cm6/underlineStateField";
 import { addWordToDictionaryWithUndo } from "./cm6/dictionaryAction";
 import { requestRewrite, RewriteChange, RewriteModal } from "./rewrite";
-import { AI_AUTO_MAX_CHARS, changesToMatches, paragraphAt } from "./aiCheck";
+import { AI_AUTO_MAX_CHARS, changesToMatches, paragraphAt, sentenceAt } from "./aiCheck";
 
 // Default SecretStorage secret name used when migrating an existing plaintext
 // key. Secret names must be lowercase alphanumeric with optional dashes.
@@ -490,9 +490,9 @@ export default class LanguageToolPlugin extends Plugin {
   }
 
   /**
-   * Check the paragraph around the cursor. The automatic pass is silent; the
-   * command passes `manual` so it reports its result and runs even when
-   * automatic checking is off.
+   * Check the text around the cursor. The automatic pass checks one sentence
+   * and is silent; the command checks the paragraph and passes `manual` so it
+   * reports its result and runs even when automatic checking is off.
    */
   public async checkParagraphWithAI(
     view: EditorView,
@@ -521,17 +521,20 @@ export default class LanguageToolPlugin extends Plugin {
       return;
     }
 
-    const paragraph = paragraphAt(view.state.doc, pos);
-    if (!paragraph || paragraph.text.trim().length < 8) {
+    // The automatic pass checks one sentence; the command keeps the paragraph.
+    const range = manual
+      ? paragraphAt(view.state.doc, pos)
+      : sentenceAt(view.state.doc, pos);
+    if (!range || range.text.trim().length < 8) {
       if (manual) {
         new Notice("Nothing to check here");
       }
       return;
     }
-    if (paragraph.text.length > AI_AUTO_MAX_CHARS) {
+    if (range.text.length > AI_AUTO_MAX_CHARS) {
       if (manual) {
         new Notice(
-          `Paragraph is too long for one AI pass (${AI_AUTO_MAX_CHARS} characters). Select part of it and use Check selection with AI.`
+          `Text is too long for one AI pass (${AI_AUTO_MAX_CHARS} characters). Select part of it and use Check selection with AI.`
         );
       }
       return;
@@ -539,7 +542,7 @@ export default class LanguageToolPlugin extends Plugin {
 
     const doc = view.state.doc;
     const generation = ++this.aiCheckGeneration;
-    const language = await this.getRewriteLanguage(paragraph.text);
+    const language = await this.getRewriteLanguage(range.text);
     if (generation !== this.aiCheckGeneration) {
       return;
     }
@@ -549,7 +552,7 @@ export default class LanguageToolPlugin extends Plugin {
     try {
       ({ changes } = await requestRewrite(
         this.settings,
-        paragraph.text,
+        range.text,
         language,
         mode
       ));
@@ -575,8 +578,8 @@ export default class LanguageToolPlugin extends Plugin {
 
     const count = this.addAIUnderlines(
       view,
-      paragraph.from,
-      paragraph.text,
+      range.from,
+      range.text,
       changes,
       manual
     );
