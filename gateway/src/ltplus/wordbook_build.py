@@ -146,13 +146,15 @@ def iter_freedict(tei: IO[bytes], target_language: str) -> Iterator[dict[str, An
     for _, element in ET.iterparse(tei, events=("end",)):
         if element.tag != TEI_NS + "entry":
             continue
-        word = (element.findtext(f".//{TEI_NS}form/{TEI_NS}orth") or "").strip()
+        # Only the entry's own grammar: translation grammars belong to the
+        # target word, not to the headword.
+        word = (element.findtext(f"{TEI_NS}form/{TEI_NS}orth") or "").strip()
         if not word:
             element.clear()
             continue
-        pos = (element.findtext(f".//{TEI_NS}gramGrp/{TEI_NS}pos") or "").strip()
+        pos = (element.findtext(f"{TEI_NS}gramGrp/{TEI_NS}pos") or "").strip()
         gender = GENDERS.get(
-            (element.findtext(f".//{TEI_NS}gramGrp/{TEI_NS}gen") or "").strip().lower(), ""
+            (element.findtext(f"{TEI_NS}gramGrp/{TEI_NS}gen") or "").strip().lower(), ""
         )
         senses: list[str] = []
         for sense in element.findall(f"{TEI_NS}sense"):

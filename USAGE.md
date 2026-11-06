@@ -207,7 +207,7 @@ is written to `data/wordbook/`. The settings tab shows progress per pair. The
 same build can be run without Obsidian:
 
 ```powershell
-python scripts/build_dictionary.py
+gateway\.venv\Scripts\python.exe scripts\build_dictionary.py
 ```
 
 After that, hover a word for half a second. The tooltip shows the headword,
