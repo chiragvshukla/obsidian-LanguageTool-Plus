@@ -32,11 +32,6 @@ What you can do in Obsidian:
 
 See [`USAGE.md`](USAGE.md) for the full walkthrough.
 
-> **Status:** Phase 9 complete. The gateway proxies `/v2/check` and
-> `/v2/languages`, applies writing modes, and serves `/rewrite`, `/score`,
-> `/topic`, and `/dictionary/*`. The plugin supports selection rewrites,
-> whole-document AI checks, long-note scoring, and the hover dictionary.
-
 > **Built with AI (open-weight models).** This is a personal project, developed
 > largely with AI coding assistants running open-weight models. Changes are
 > reviewed and tested before use, but expect rough edges and verify anything
