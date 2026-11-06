@@ -103,9 +103,10 @@ export class RewriteModal extends Modal {
 
   onOpen() {
     const { contentEl } = this;
+    this.modalEl.addClass("lt-rewrite-modal");
     contentEl.createEl("h2", { text: "AI rewrite" });
     contentEl.createEl("h3", { text: "Original" });
-    contentEl.createEl("pre", { text: this.original });
+    contentEl.createEl("pre", { cls: "lt-rewrite-text", text: this.original });
     contentEl.createEl("h3", { text: "Rewritten" });
     this.renderRewritten(contentEl);
 
@@ -116,7 +117,7 @@ export class RewriteModal extends Modal {
 
     if (this.changes.length > 0) {
       contentEl.createEl("h3", { text: "Changes" });
-      const list = contentEl.createEl("ul");
+      const list = contentEl.createEl("ul", { cls: "lt-rewrite-changes" });
       for (const change of this.changes) {
         list.createEl("li", {
           text:
@@ -148,7 +149,7 @@ export class RewriteModal extends Modal {
    * rather than a misleading highlight.
    */
   private renderRewritten(container: HTMLElement) {
-    const pre = container.createEl("pre");
+    const pre = container.createEl("pre", { cls: "lt-rewrite-text" });
     const spans: { offset: number; length: number; change: RewriteChange }[] = [];
 
     let cursor = 0;

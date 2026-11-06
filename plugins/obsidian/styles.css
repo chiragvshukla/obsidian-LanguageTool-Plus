@@ -271,6 +271,31 @@
   margin-left: var(--size-4-2);
 }
 
+.lt-rewrite-modal {
+  width: min(860px, 92vw);
+}
+
+.lt-rewrite-modal .modal-content {
+  max-height: calc(90vh - 60px);
+  overflow-y: auto;
+}
+
+.lt-rewrite-text {
+  max-height: 30vh;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  margin: 0 0 var(--size-4-4);
+  padding: var(--size-4-2);
+  background-color: var(--background-primary-alt);
+  border-radius: var(--radius-s);
+}
+
+.lt-rewrite-changes {
+  max-height: 18vh;
+  overflow-y: auto;
+}
+
 .lt-rewrite-change {
   background-color: var(--text-highlight-bg, rgba(255, 208, 0, 0.35));
   border-radius: var(--radius-s);
