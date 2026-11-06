@@ -44,7 +44,7 @@ import {
 } from "./cm6/underlineStateField";
 import { addWordToDictionaryWithUndo } from "./cm6/dictionaryAction";
 import { requestRewrite, RewriteChange, RewriteModal } from "./rewrite";
-import { AI_AUTO_MAX_CHARS, AI_RULE_ID, changesToMatches, paragraphAt } from "./aiCheck";
+import { AI_AUTO_MAX_CHARS, changesToMatches, paragraphAt } from "./aiCheck";
 
 // Default SecretStorage secret name used when migrating an existing plaintext
 // key. Secret names must be lowercase alphanumeric with optional dashes.
@@ -604,16 +604,6 @@ export default class LanguageToolPlugin extends Plugin {
     if (!replaceEmpty && matches.length === 0) {
       return 0;
     }
-    const occupied: { from: number; to: number }[] = [];
-    view.state
-      .field(underlineField)
-      .between(baseOffset, baseOffset + text.length, (from, to, value) => {
-        const spec = value.spec as { match?: MatchesEntity } | undefined;
-        if (spec?.match?.rule.id !== AI_RULE_ID) {
-          occupied.push({ from, to });
-        }
-      });
-
     const effects: StateEffect<unknown>[] = [
       clearAIUnderlinesInRange.of({
         from: baseOffset,
@@ -624,9 +614,6 @@ export default class LanguageToolPlugin extends Plugin {
     for (const match of matches) {
       const from = match.offset;
       const to = from + match.length;
-      if (occupied.some(range => from < range.to && to > range.from)) {
-        continue;
-      }
       effects.push(addUnderline.of({ from, to, match }));
       added += 1;
     }
@@ -667,6 +654,8 @@ export default class LanguageToolPlugin extends Plugin {
         const replacements = match ? getVisibleReplacements(match) : [];
 
         // Check that there is exactly one match that has a replacement in the slot that is called.
+        // shortcut: overlapping LT and AI hints make this command unavailable;
+        // use the buttons in the combined popover instead.
         const preconditionsSuccessfull =
           relevantMatches.length === 1 && replacements.length >= n;
 

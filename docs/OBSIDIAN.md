@@ -65,8 +65,10 @@ are validated by the gateway before the plugin sees them.
   correctness pass rather than a style rewrite. Each change becomes a normal
   LanguageTool-shaped underline (`rule.id` = `AI_GRAMMAR`) with the model's
   replacement and explanation, so the existing popover, jump, ignore, and
-  accept-suggestion commands work unchanged. Spans that overlap deterministic
-  LT underlines are skipped.
+  accept-suggestion commands work unchanged. AI spans are drawn even when they
+  overlap deterministic LT underlines; clicking the shared text shows one
+  popover with a section per suggestion, each with its own buttons and Ignore.
+  A deletion has no replacement button, but still shows its explanation.
 - **Check current paragraph with AI** runs the same pass on the paragraph around
   the cursor, without needing a selection. It reports its result or error in a
   notice and works even when automatic checking is off.

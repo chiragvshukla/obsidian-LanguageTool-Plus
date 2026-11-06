@@ -24,10 +24,6 @@ export function changesToMatches(
   const matches: MatchesEntity[] = [];
   let cursor = 0;
   for (const change of changes) {
-    // The popover renders no button for an empty replacement.
-    if (!change.replacement.trim()) {
-      continue;
-    }
     let offset = change.offset;
     let length = change.length;
     if (
@@ -48,9 +44,16 @@ export function changesToMatches(
     cursor = offset + length;
     matches.push({
       message:
-        change.explanation || `${change.original} → ${change.replacement}`,
+        change.explanation ||
+        (change.replacement
+          ? `${change.original} → ${change.replacement}`
+          : `Remove "${change.original}"`),
       shortMessage: "AI grammar",
-      replacements: [{ value: change.replacement }],
+      // An empty replacement is a removal hint: the popover shows the
+      // explanation and Ignore, but no button it cannot apply.
+      replacements: change.replacement
+        ? [{ value: change.replacement }]
+        : [],
       offset: baseOffset + offset,
       length,
       context: { text: source, offset, length },

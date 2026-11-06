@@ -222,19 +222,21 @@ depend on a slow, stochastic service.
 
 **Decision:** keep `/v2/check` LLM-free. Reuse `POST /rewrite` for an explicit
 "Check selection with AI" command that always sends `neutral`, converts each
-validated change into an `AI_GRAMMAR` match, and skips spans that overlap a
-deterministic LT underline. Add a separate, default-off "AI auto-check current
-paragraph" setting: after 10 seconds without typing it checks at most 2,000
-characters around the cursor, discards stale results, and redraws only its own
-underlines. Rewrite changes carry source `offset`/`length`, which also drive
-changed-span highlighting in the review modal.
+validated change into an `AI_GRAMMAR` match, and draws it even where a
+deterministic LT underline already exists. Overlapping hints share one popover
+with a section per suggestion, so neither is hidden. Add a separate, default-off
+"AI auto-check current paragraph" setting: after 10 seconds without typing it
+checks at most 2,000 characters around the cursor, discards stale results, and
+redraws only its own underlines. Rewrite changes carry source `offset`/`length`,
+which also drive changed-span highlighting in the review modal.
 
 **Consequences:** AI hints look and behave like normal LT suggestions, including
-accept, ignore, and jump. Auto-check can spend a request on a paragraph the
-user has left, and the model can flag correct text; that is why it is opt-in
-and scoped. Cursor-only updates do not cancel the debounce; the cursor is read
-when the pause ends. LT checks clear only their own underlines so they cannot
-erase AI hints, and an empty automatic AI result leaves existing hints in
+accept, ignore, and jump. Where both underline the same words, one popover lists
+both suggestions instead of hiding one. Auto-check can spend a request on a
+paragraph the user has left, and the model can flag correct text; that is why it
+is opt-in and scoped. Cursor-only updates do not cancel the debounce; the cursor
+is read when the pause ends. LT checks clear only their own underlines so they
+cannot erase AI hints, and an empty automatic AI result leaves existing hints in
 place. Whole-document checking and paragraph chunking remain deferred.
 `shortcut: auto-check is one paragraph and 2,000 characters, add chunking if
 whole-note AI checking becomes a use case.`

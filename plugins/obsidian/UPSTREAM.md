@@ -37,6 +37,10 @@ unmodified upstream files except where listed below. The upstream `test/` and
    - `src/cm6/underlineStateField.ts`: `clearAIUnderlinesInRange` replaces only
      AI underlines; `clearLTUnderlines`/`clearLTUnderlinesInRange` let an LT
      check clear only its own underlines, so AI hints survive a re-check.
+   - `src/cm6/tooltipField.ts`: one popover can now list several overlapping
+     suggestions, each with its own replacement buttons and Ignore. A
+     non-breaking-rule hint (a deletion) carries its explanation without a
+     replacement button.
 
 2. **Writing modes on checks**
    - `src/api.ts`: sends `writing_mode` on `/v2/check` when `urlMode` is

@@ -16,9 +16,13 @@ const changes = [
 ];
 
 const matches = changesToMatches(100, source, changes);
-equal(matches.length, 2);
+equal(matches.length, 3);
 equal([matches[0].offset, matches[0].length], [100, 3]);
-equal(matches[1].offset, 100 + source.indexOf("Das"));
+equal([matches[1].offset, matches[1].length], [100 + source.indexOf("geht"), 4]);
+// A deletion is kept as an explanation-only hint with no replacement button.
+equal(matches[1].replacements, []);
+equal(matches[1].message, 'Remove "geht"');
+equal(matches[2].offset, 100 + source.indexOf("Das"));
 equal(matches[0].rule.id, "AI_GRAMMAR");
 
 const withEmoji = "😀 Der Mädchen geht.";

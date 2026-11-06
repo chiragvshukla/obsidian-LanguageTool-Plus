@@ -247,3 +247,9 @@
   font-size: var(--font-ui-smaller);
   padding: 0 var(--size-2-1);
 }
+
+.lt-suggestion-divider {
+  border: none;
+  border-top: 1px solid var(--background-modifier-border);
+  margin: 8px 0 0;
+}

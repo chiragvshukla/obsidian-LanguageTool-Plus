@@ -20,21 +20,15 @@ import { addWordToDictionaryWithUndo } from "./dictionaryAction";
 function contructTooltip(
   plugin: LanguageToolPlugin,
   view: EditorView,
-  underline: UnderlineEffect
+  underlines: UnderlineEffect[]
 ) {
-  const match = underline.match;
-  const message = match.message;
-  const title = match.shortMessage;
-  const buttons = getVisibleReplacements(match);
-  const category = match.rule.category.id;
-  const ruleId = match.rule.id;
-
   const mainClass = plugin.settings.glassBg
     ? "lt-predictions-container-glass"
     : "lt-predictions-container";
+  const firstCategory = underlines[0]?.match.rule.category.id ?? "GRAMMAR";
 
   return createDiv(
-    { cls: [mainClass, getIssueTypeClassName(category)] },
+    { cls: [mainClass, getIssueTypeClassName(firstCategory)] },
     root => {
       // Keep the editor focused while the popover is clicked: a mousedown
       // that blurs the editor makes live preview re-render the surrounding
@@ -44,7 +38,19 @@ function contructTooltip(
         event.preventDefault();
       });
 
-      if (title) {
+      underlines.forEach((underline, index) => {
+        if (index > 0) {
+          root.createEl("hr", { cls: "lt-suggestion-divider" });
+        }
+
+        const match = underline.match;
+        const message = match.message;
+        const title = match.shortMessage;
+        const buttons = getVisibleReplacements(match);
+        const category = match.rule.category.id;
+        const ruleId = match.rule.id;
+
+        if (title) {
         root.createSpan({ cls: "lt-title" }, span => {
           span.createSpan({ text: title });
         });
@@ -92,9 +98,7 @@ function contructTooltip(
             button => {
               setIcon(button, "info");
               button.onclick = () => {
-                const popup = document
-                  .getElementsByClassName("lt-info-box")
-                  .item(0);
+                const popup = infoContainer.querySelector(".lt-info-box");
                 if (!popup) {
                   throw Error(
                     "Programming error: failed to create popup. Please notify the LanguageTool maintainer if this problem persists."
@@ -138,6 +142,7 @@ function contructTooltip(
             };
           }
         });
+      });
       });
     }
   );
@@ -223,7 +228,7 @@ function getTooltip(
         arrow: false,
         create: view => {
           return {
-            dom: contructTooltip(plugin, view, primaryUnderline)
+            dom: contructTooltip(plugin, view, underlinesAtCursor)
           };
         }
       }
