@@ -325,6 +325,32 @@ git. Without a lemma tagger the alias index can be patchy for unusual forms;
 the cap of five aliases per form keeps homograph groups bounded. The indexes
 load lazily per pair, so a cold first hover can pause briefly.
 
+## ADR-019 — The score separates measured facts from model judgement
+
+**Status:** accepted
+
+**Context:** a writing score is useful only if the reader knows what is exact
+and what is an opinion. LanguageTool findings, word counts, and sentence
+lengths are deterministic. Clarity, tone fit, vocabulary, and structure are
+judgements, and a small local model can grade the same text differently on
+repeated runs. A single authoritative number would hide that difference.
+
+**Decision:** `POST /score` returns `facts` from the deterministic pass
+(`words`, `sentences`, `averageSentenceWords`, `ltIssues` by category) and 1–5
+grades only for `clarity`, `tone`, `vocabulary`, and `structure`, plus at most
+three recommendations. There is no overall score and no grammar grade, because
+grammar is already measured exactly. The plugin renders both parts in one
+read-only modal and labels the grades as model judgement. Requests are explicit
+commands; they never create underlines, are never automatic, and are not cached.
+No second LanguageTool call is made: the same `/v2/check` input that
+`Check Text` uses feeds the facts.
+
+**Consequences:** the report is less tidy than a single number but cannot
+contradict the deterministic findings. If the model proves too noisy, the
+grades can be dropped without changing the endpoint shape. While the modal is
+open, automatic LT and AI checks are suppressed so the note does not change
+underneath the report; manual commands still work.
+
 ## Phase 0 findings
 
 - LanguageTool: prebuilt image + bind-mounted `grammar_custom.xml` works; the

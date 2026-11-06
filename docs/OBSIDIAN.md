@@ -97,6 +97,17 @@ are validated by the gateway before the plugin sees them.
   list. Switching one off is enforced by the gateway, not only hidden by the
   plugin.
 
+- **Score current note with AI** calls `POST /score` once. The gateway makes
+  one `/v2/check` call for exact word, sentence, and category counts, then one
+  model call for 1–5 grades (clarity, tone fit, vocabulary, structure) and up
+  to three recommendations. The modal is read-only and nothing is cached.
+  While it is open, automatic LT and AI checks are suppressed so the note
+  cannot change underneath the report. A note longer than
+  `LLM_CONTEXT_CHARS` returns `413 text_too_long`; shorten it to score it.
+- **Insert writing topic with AI** calls `POST /topic` and inserts the result
+  at the cursor as a blockquote (`Writing prompt` and `Angle` lines). Topics
+  may repeat across sessions; nothing is stored.
+
 The model is slower than LanguageTool (seconds, not milliseconds), so AI
 auto-check is opt-in and scoped to one sentence. Explicit commands have no
 such cap beyond the gateway's `LLM_CONTEXT_CHARS`.
@@ -136,6 +147,8 @@ Implemented:
    gateway and sent on every `/rewrite` call.
 8. The local hover dictionary: settings, download status, and a CM6 hover
    tooltip backed by the gateway.
+9. Writing practice: a read-only score report (`POST /score`) and blockquote
+   topic insertion (`POST /topic`).
 
 Do not modify the upstream request shape otherwise. Record the upstream commit
 in `plugins/obsidian/UPSTREAM.md` and keep the AGPL-3.0 license.

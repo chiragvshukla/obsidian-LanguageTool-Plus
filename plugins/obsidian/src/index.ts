@@ -46,6 +46,8 @@ import {
 } from "./cm6/underlineStateField";
 import { addWordToDictionaryWithUndo } from "./cm6/dictionaryAction";
 import { requestRewrite, RewriteChange, RewriteModal } from "./rewrite";
+import { ScoreModal, requestScore, requestTopic } from "./practice";
+import { formatTopic } from "./practiceHelpers";
 import { AI_AUTO_MAX_CHARS, changesToMatches, contextAround, paragraphAt, sentenceAt } from "./aiCheck";
 import { WritingModeModal } from "./modePicker";
 
@@ -106,6 +108,9 @@ export default class LanguageToolPlugin extends Plugin {
   private ribbonIcon: HTMLElement | null = null;
   // Discards an automatic check when a newer one starts.
   private aiCheckGeneration = 0;
+  // The score modal is read-only; automatic suggestions pause while it is
+  // open so the note does not change under the report.
+  public scoringOpen = false;
 
   public async onload() {
     // Settings
@@ -408,6 +413,36 @@ export default class LanguageToolPlugin extends Plugin {
         return true;
       }
     });
+
+    this.addCommand({
+      id: "ltai-score-document",
+      name: "Score current note with AI",
+      editorCheckCallback: (checking, editor) => {
+        if (!this.settings.enableAIFeatures) {
+          return false;
+        }
+        if (checking) {
+          return editor.getValue().trim().length > 0;
+        }
+        this.runAIAction(this.scoreDocument(editor));
+        return true;
+      }
+    });
+
+    this.addCommand({
+      id: "ltai-writing-topic",
+      name: "Insert writing topic with AI",
+      editorCheckCallback: (checking, editor) => {
+        if (!this.settings.enableAIFeatures) {
+          return false;
+        }
+        if (checking) {
+          return true;
+        }
+        this.runAIAction(this.insertWritingTopic(editor));
+        return true;
+      }
+    });
   }
 
   /**
@@ -473,6 +508,47 @@ export default class LanguageToolPlugin extends Plugin {
     }).open();
   }
 
+  private async scoreDocument(editor: Editor): Promise<void> {
+    const text = editor.getValue();
+    if (!text.trim()) {
+      new Notice("Nothing to score");
+      return;
+    }
+    this.scoringOpen = true;
+    try {
+      const file = this.app.workspace.getActiveFile();
+      const mode =
+        getDocumentMode(this.app, file) ??
+        this.settings.writingMode ??
+        "neutral";
+      const language = await this.getRewriteLanguage(text.slice(0, 500));
+      const result = await requestScore(this.settings, text, language, mode);
+      new ScoreModal(this.app, result, WRITING_MODES[mode], () => {
+        this.scoringOpen = false;
+      }).open();
+    } catch (e) {
+      this.scoringOpen = false;
+      throw e;
+    }
+  }
+
+  private async insertWritingTopic(editor: Editor): Promise<void> {
+    const file = this.app.workspace.getActiveFile();
+    const mode =
+      getDocumentMode(this.app, file) ?? this.settings.writingMode ?? "neutral";
+    const language = await this.getRewriteLanguage(
+      editor.getValue().slice(0, 500)
+    );
+    const result = await requestTopic(this.settings, language, mode);
+
+    const cursor = editor.getCursor();
+    const prefix = cursor.ch === 0 ? "" : "\n\n";
+    const insert = `${prefix}${formatTopic(result)}\n\n`;
+    const offset = editor.posToOffset(cursor);
+    editor.replaceRange(insert, cursor);
+    editor.setCursor(editor.offsetToPos(offset + insert.length));
+  }
+
   /** Check the selection and show the model's changes as normal suggestions. */
   private async checkSelectionWithAI(editor: Editor): Promise<void> {
     const text = editor.getSelection();
@@ -519,7 +595,10 @@ export default class LanguageToolPlugin extends Plugin {
     if (!this.settings.enableAIFeatures) {
       return;
     }
-    if (!manual && (!this.settings.aiAutoCheck || !view.hasFocus)) {
+    if (
+      !manual &&
+      (this.scoringOpen || !this.settings.aiAutoCheck || !view.hasFocus)
+    ) {
       return;
     }
     if (!manual && !view.state.selection.main.empty) {
@@ -870,6 +949,25 @@ export default class LanguageToolPlugin extends Plugin {
           this.runAIAction(
             this.checkParagraphWithAI(editorToCodeMirror(editor), true)
           );
+        });
+      });
+      menu.addSeparator();
+      menu.addItem(item => {
+        item.setTitle("Score current note with AI");
+        item.setIcon("sparkles");
+        item.setDisabled(!editor || !editor.getValue().trim());
+        item.onClick(() => {
+          if (!editor) return;
+          this.runAIAction(this.scoreDocument(editor));
+        });
+      });
+      menu.addItem(item => {
+        item.setTitle("Insert writing topic with AI");
+        item.setIcon("sparkles");
+        item.setDisabled(!editor);
+        item.onClick(() => {
+          if (!editor) return;
+          this.runAIAction(this.insertWritingTopic(editor));
         });
       });
       menu.addSeparator();

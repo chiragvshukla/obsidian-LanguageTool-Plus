@@ -186,9 +186,16 @@ possibly credentials.
     normal underlines.
   - **Check current paragraph with AI** — same pass on the paragraph around the
     cursor.
+  - **Score current note with AI** — opens a read-only report: exact word,
+    sentence, and LanguageTool counts, plus 1–5 grades for clarity, tone
+    fit, vocabulary, and structure and up to three recommendations. One
+    LanguageTool pass and one model call; nothing is applied or stored.
+  - **Insert writing topic with AI** — inserts a practice topic and angle as a
+    blockquote at the cursor in the current note.
 
-AI output is validated by the gateway before it reaches the plugin. Numbers,
-links, and code blocks are protected.
+Automatic suggestions pause while the score report is open. AI output is
+validated by the gateway before it reaches the plugin. Numbers, links, and
+code blocks are protected.
 
 ### Hover dictionary
 

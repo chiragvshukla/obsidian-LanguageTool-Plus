@@ -286,6 +286,48 @@
   padding: 0 var(--size-2-1);
 }
 
+.lt-score-mode {
+  color: var(--text-muted);
+}
+
+.lt-score-facts {
+  margin-top: var(--size-2-2);
+}
+
+.lt-score-breakdown {
+  color: var(--text-faint);
+  font-size: var(--font-ui-smaller);
+}
+
+.lt-score-grades {
+  display: grid;
+  gap: var(--size-2-1);
+  margin: var(--size-4-3) 0;
+}
+
+.lt-score-row {
+  display: flex;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--background-modifier-border);
+  padding-bottom: var(--size-2-1);
+}
+
+.lt-score-value {
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--font-semibold);
+}
+
+.lt-score-recs {
+  margin: var(--size-2-2) 0 var(--size-4-3);
+  padding-left: var(--size-4-4);
+}
+
+.lt-score-note {
+  color: var(--text-faint);
+  font-size: var(--font-ui-smaller);
+  margin-bottom: var(--size-4-3);
+}
+
 .lt-dict-tooltip {
   max-width: 22em;
   padding: var(--size-4-2) var(--size-4-3);

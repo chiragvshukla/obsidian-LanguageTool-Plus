@@ -32,6 +32,12 @@ export function buildAutoCheckHandler(plugin: LanguageToolPlugin) {
           return;
         }
 
+        if (plugin.scoringOpen) {
+          window.clearTimeout(debounceTimer);
+          window.clearTimeout(aiTimer);
+          return;
+        }
+
         if (shouldAutoCheck(plugin, view)) {
           // Keep positions accumulated from earlier edits valid in the new doc
           if (minRange !== Infinity) {
@@ -47,6 +53,9 @@ export function buildAutoCheckHandler(plugin: LanguageToolPlugin) {
           window.clearTimeout(debounceTimer);
 
           debounceTimer = window.setTimeout(() => {
+            if (plugin.scoringOpen) {
+              return;
+            }
             const docLength = view.state.doc.length;
             const from = Math.min(minRange, docLength);
             const to = Math.min(maxRange, docLength);
@@ -76,6 +85,9 @@ export function buildAutoCheckHandler(plugin: LanguageToolPlugin) {
           window.clearTimeout(aiTimer);
           aiTimer = window.setTimeout(() => {
             aiTimer = -1;
+            if (plugin.scoringOpen) {
+              return;
+            }
             // Read the cursor when the pause ends: Obsidian emits
             // selection-only updates while typing, and they must not cancel
             // the check.

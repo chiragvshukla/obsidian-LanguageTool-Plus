@@ -7,7 +7,7 @@
     "dev": "node esbuild.config.local.mjs",
     "build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
     "test:e2e": "wdio run ./wdio.conf.mts",
-    "test:ai": "tsx src/aiCheck.test.ts && tsx src/dictionaryHelpers.test.ts",
+    "test:ai": "tsx src/aiCheck.test.ts && tsx src/dictionaryHelpers.test.ts && tsx src/practiceHelpers.test.ts",
     "lint": "eslint .",
     "slint": "stylelint styles.css",
     "lint:fix": "eslint . --fix",
