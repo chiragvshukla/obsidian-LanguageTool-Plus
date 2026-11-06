@@ -83,9 +83,13 @@ are validated by the gateway before the plugin sees them.
   existing AI underlines; only an explicit check replaces them. LT checking
   stays instant and independent, and an LT check now clears only its own
   underlines, so an automatic LT pass cannot wipe visible AI hints.
+- The status-bar **Aa** icon and the ribbon icon open the same menu: check the
+  document, switch writing mode, run the AI actions, toggle automatic checking,
+  and clear suggestions. AI entries are hidden while AI features are off;
+  selection actions stay disabled without a selection.
 
 The model is slower than LanguageTool (seconds, not milliseconds), so AI
-auto-check is opt-in and scoped to one paragraph. Explicit commands have no
+auto-check is opt-in and scoped to one sentence. Explicit commands have no
 such cap beyond the gateway's `LLM_CONTEXT_CHARS`.
 
 ## Fork changes (Phase 6)

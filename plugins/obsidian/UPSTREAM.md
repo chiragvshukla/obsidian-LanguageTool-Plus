@@ -33,6 +33,10 @@ unmodified upstream files except where listed below. The upstream `test/` and
    - `src/index.ts`: added "Rewrite selection with AI", "Check selection with
      AI", and "Check current paragraph with AI". All are hidden unless
      `enableAIFeatures` is on; the checks use the note's resolved writing mode.
+     The status-bar menu and the ribbon icon open one shared menu with the
+     checks, AI actions, and a writing-mode picker.
+   - `src/modePicker.ts`: new. `FuzzySuggestModal` over `WRITING_MODES` for the
+     shared menu; it writes `settings.writingMode`.
    - `src/cm6/buildAutoCheckHandler.ts`: optional 4-second sentence check
      when `aiAutoCheck` is on. Cursor-only updates do not cancel it; the cursor
      is read when the pause ends, and edits invalidate the result.

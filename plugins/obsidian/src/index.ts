@@ -16,6 +16,7 @@ import {
   DEFAULT_SETTINGS,
   LanguageToolPluginSettings,
   LanguageToolSettingsTab,
+  WRITING_MODES,
   getServerUrl
 } from "./SettingsTab";
 import { LanguageToolApi, MatchesEntity } from "./LanguageToolTypings";
@@ -45,6 +46,7 @@ import {
 import { addWordToDictionaryWithUndo } from "./cm6/dictionaryAction";
 import { requestRewrite, RewriteChange, RewriteModal } from "./rewrite";
 import { AI_AUTO_MAX_CHARS, changesToMatches, paragraphAt, sentenceAt } from "./aiCheck";
+import { WritingModeModal } from "./modePicker";
 
 // Default SecretStorage secret name used when migrating an existing plaintext
 // key. Secret names must be lowercase alphanumeric with optional dashes.
@@ -701,12 +703,8 @@ export default class LanguageToolPlugin extends Plugin {
       if (!this.ribbonIcon) {
         this.ribbonIcon = this.addRibbonIcon(
           "spell-check",
-          "Check text with LanguageTool",
-          () => {
-            this.checkActiveDocument().catch(e => {
-              console.error(e);
-            });
-          }
+          "LanguageTool",
+          (evt: MouseEvent) => this.buildPluginMenu().showAtMouseEvent(evt)
         );
       }
       return;
@@ -784,7 +782,19 @@ export default class LanguageToolPlugin extends Plugin {
     const statusBarRect = this.statusBarText.parentElement?.getBoundingClientRect();
     const statusBarIconRect = this.statusBarText.getBoundingClientRect();
 
-    new Menu()
+    this.buildPluginMenu().showAtPosition({
+      x: statusBarIconRect.right + 5,
+      y: (statusBarRect?.top ?? 0) - 5
+    });
+  };
+
+  /** The status bar and the ribbon icon share this menu. */
+  private buildPluginMenu(): Menu {
+    const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+    const editor = view?.editor;
+    const hasSelection = !!editor && editor.getSelection().trim().length > 0;
+
+    const menu = new Menu()
       .addItem(item => {
         item.setTitle("Check current document");
         item.setIcon("checkbox-glyph");
@@ -796,6 +806,48 @@ export default class LanguageToolPlugin extends Plugin {
           }
         });
       })
+      .addItem(item => {
+        const current = this.settings.writingMode ?? "neutral";
+        item.setTitle(`Writing mode: ${WRITING_MODES[current]}`);
+        item.setIcon("type");
+        item.onClick(() => this.openWritingModePicker());
+      })
+      .addSeparator();
+
+    if (this.settings.enableAIFeatures) {
+      menu.addItem(item => {
+        item.setTitle("Rewrite selection with AI");
+        item.setIcon("sparkles");
+        item.setDisabled(!hasSelection);
+        item.onClick(() => {
+          if (!editor) return;
+          this.runAIAction(this.rewriteSelection(editor));
+        });
+      });
+      menu.addItem(item => {
+        item.setTitle("Check selection with AI");
+        item.setIcon("sparkles");
+        item.setDisabled(!hasSelection);
+        item.onClick(() => {
+          if (!editor) return;
+          this.runAIAction(this.checkSelectionWithAI(editor));
+        });
+      });
+      menu.addItem(item => {
+        item.setTitle("Check current paragraph with AI");
+        item.setIcon("sparkles");
+        item.setDisabled(!editor);
+        item.onClick(() => {
+          if (!editor) return;
+          this.runAIAction(
+            this.checkParagraphWithAI(editorToCodeMirror(editor), true)
+          );
+        });
+      });
+      menu.addSeparator();
+    }
+
+    return menu
       .addItem(item => {
         item.setTitle(
           this.settings.shouldAutoCheck
@@ -830,17 +882,32 @@ export default class LanguageToolPlugin extends Plugin {
         item.setTitle("Clear suggestions");
         item.setIcon("reset");
         item.onClick(() => {
-          const view = this.app.workspace.getActiveViewOfType(MarkdownView);
-          if (!view) return;
-          editorToCodeMirror(view.editor).dispatch({
+          const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
+          if (!activeView) return;
+          editorToCodeMirror(activeView.editor).dispatch({
             effects: [clearUnderlines.of(null)]
           });
         });
-      })
-      .showAtPosition({
-        x: statusBarIconRect.right + 5,
-        y: (statusBarRect?.top ?? 0) - 5
       });
+  }
+
+  private openWritingModePicker(): void {
+    new WritingModeModal(
+      this.app,
+      this.settings.writingMode,
+      mode => {
+        this.settings.writingMode = mode;
+        void this.saveSettings().catch(e => console.error(e));
+        new Notice(`Writing mode: ${WRITING_MODES[mode]}`, 2000);
+      }
+    ).open();
+  }
+
+  private runAIAction(action: Promise<void>): void {
+    action.catch(e => {
+      console.error(e);
+      new Notice(e instanceof Error ? e.message : String(e), 8000);
+    });
   };
 
   public async runDetection(
