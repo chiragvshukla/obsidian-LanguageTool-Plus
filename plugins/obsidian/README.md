@@ -6,7 +6,9 @@ The plugin works with the free public LanguageTool API, with [LanguageTool](#hos
 
 ![demo-02022022](https://user-images.githubusercontent.com/98941594/152318322-83abb30d-fee0-44cf-9700-262f4c0de4c4.png)
 
-> **A note on AI usage:** I use Claude during development. It lets me build features and fixes faster than my free time would otherwise allow. Every change is still reviewed by me before it is released. If you are not comfortable with AI-assisted code, that's a fair position, and you should simply not use this plugin.
+> **A note on AI usage:** The upstream author notes that he uses Claude during development. This fork keeps that workflow; every change here is still reviewed before release. If you are not comfortable with AI-assisted code, that is a fair position, and you should not use this plugin.
+
+This fork is maintained by [Chirag Shukla](https://github.com/chiragvshukla). It is based on [Clemens-E/obsidian-languagetool-plugin](https://github.com/Clemens-E/obsidian-languagetool-plugin) by Clemens Ertle and contributors, including Matthew Meyers; see `UPSTREAM.md` and the repository's `THIRD_PARTY_NOTICES.md` for full attribution.
 
 ## Installation
 

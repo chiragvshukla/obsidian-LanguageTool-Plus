@@ -4,7 +4,7 @@
 	"version": "0.9.7",
 	"minAppVersion": "1.8.10",
 	"description": "Unofficial LanguageTool integration for advanced grammar and spell checking.",
-	"author": "Clemens Ertle",
-	"authorUrl": "https://github.com/Clemens-E",
+	"author": "Chirag Shukla",
+	"authorUrl": "https://github.com/chiragvshukla",
 	"isDesktopOnly": false
 }

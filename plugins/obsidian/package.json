@@ -15,7 +15,7 @@
     "prettier": "prettier --write --use-tabs --single-quote --print-width 120 --trailing-comma all --end-of-line lf"
   },
   "keywords": [],
-  "author": "Clemens Ertle",
+  "author": "Chirag Shukla",
   "contributors": [
     {
       "name": "Clemens Ertle",
@@ -26,8 +26,10 @@
       "url": "https://github.com/mgmeyers"
     }
   ],
+  "license": "AGPL-3.0-or-later",
   "repository": {
-    "url": "https://github.com/Clemens-E/obsidian-languagetool-plugin"
+    "type": "git",
+    "url": "https://github.com/chiragvshukla/obisidian-LanguageTool-Plus.git"
   },
   "devDependencies": {
     "@codemirror/language": "https://github.com/lishid/cm-language",
