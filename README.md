@@ -15,8 +15,9 @@ It combines three open parts:
 The optional Obsidian plugin fork adds per-note modes and a rewrite command.
 The upstream plugin already works against the gateway in pass-through mode.
 
-> **Status:** scaffold. The gateway currently exposes `/healthz` only. Feature
-> work follows `docs/PLAN.md`.
+> **Status:** Phase 1. The gateway proxies `/v2/check` and `/v2/languages` and
+> applies writing modes. Rewrites and inline AI suggestions follow
+> `docs/PLAN.md`.
 
 ## Requirements
 

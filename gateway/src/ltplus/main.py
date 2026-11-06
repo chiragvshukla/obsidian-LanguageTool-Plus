@@ -1,34 +1,59 @@
-"""FastAPI application entry point.
-
-The scaffold exposes only a health check. LanguageTool-compatible endpoints are
-added in Phase 1; see docs/PLAN.md.
-"""
+"""FastAPI application entry point."""
 
 from __future__ import annotations
 
 import logging
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 
+import httpx
 from fastapi import FastAPI
 
 from ltplus import __version__
-from ltplus.config import get_settings
-
-settings = get_settings()
-
-logging.basicConfig(
-    level=settings.log_level.upper(),
-    format="%(asctime)s %(levelname)s %(name)s %(message)s",
-)
-
-app = FastAPI(
-    title="LanguageToolPlus",
-    version=__version__,
-    docs_url=None,
-    redoc_url=None,
-)
+from ltplus.api import router
+from ltplus.config import Settings, get_settings
+from ltplus.modes import ModeConfigError, load_modes
 
 
-@app.get("/healthz")
-def healthz() -> dict[str, str]:
-    """Liveness probe. Does not call downstream services."""
-    return {"status": "ok", "version": __version__}
+def create_app(settings: Settings | None = None) -> FastAPI:
+    """Build the app. Mode configuration is validated before serving."""
+    settings = settings or get_settings()
+
+    logging.basicConfig(
+        level=settings.log_level.upper(),
+        format="%(asctime)s %(levelname)s %(name)s %(message)s",
+    )
+
+    modes = load_modes(settings.modes_dir)
+    if settings.default_mode not in modes:
+        raise ModeConfigError(f"default mode '{settings.default_mode}' is not defined")
+
+    @asynccontextmanager
+    async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        async with httpx.AsyncClient(
+            base_url=settings.lt_url.rstrip("/"),
+            timeout=settings.lt_timeout_seconds,
+        ) as client:
+            app.state.lt = client
+            yield
+
+    app = FastAPI(
+        title="LanguageToolPlus",
+        version=__version__,
+        docs_url=None,
+        redoc_url=None,
+        lifespan=lifespan,
+    )
+    app.state.settings = settings
+    app.state.modes = modes
+    app.include_router(router)
+
+    @app.get("/healthz")
+    def healthz() -> dict[str, str]:
+        """Liveness probe. Does not call downstream services."""
+        return {"status": "ok", "version": __version__}
+
+    return app
+
+
+app = create_app()

@@ -68,7 +68,7 @@ There is no database.
 
 1. Plugin sends `POST /v2/check`.
 2. Gateway resolves the mode:
-   - from an explicit `mode` parameter (fork), or
+   - from an optional `mode` form field (ignored by the upstream plugin), or
    - `DEFAULT_MODE`.
 3. Gateway maps the mode to `level` and `enabledCategories` /
    `disabledCategories`, intersected with what the client sent.

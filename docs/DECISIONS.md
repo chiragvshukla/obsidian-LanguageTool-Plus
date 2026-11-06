@@ -128,6 +128,21 @@ the parsed object regardless of what the server accepts.
 **Consequences:** faster rewrites and no fence-stripping. Providers without
 JSON mode still work, but their output goes through the full validator chain.
 
+## ADR-011 — Mode and client settings combine as "most restrictive"
+
+**Status:** accepted
+
+**Context:** the upstream plugin sends `level` and its own category lists. A
+mode must influence checks without silently discarding the user's settings.
+
+**Decision:** `picky` wins if either side asks for it. Disabled categories are
+unioned; enabled categories are intersected when both sides provide a list.
+A category disabled on either side is never re-enabled.
+
+**Consequences:** modes can tighten checks or remove noise, but cannot override
+an explicit client restriction. The rule is visible in `merge_categories` and
+covered by tests.
+
 ## Phase 0 findings
 
 - LanguageTool: prebuilt image + bind-mounted `grammar_custom.xml` works; the
