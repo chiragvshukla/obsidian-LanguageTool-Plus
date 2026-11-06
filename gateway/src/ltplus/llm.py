@@ -55,28 +55,44 @@ async def chat_json(
     temperature: float,
     model_id: str,
     max_tokens: int | None = None,
+    reasoning_effort: str | None = None,
 ) -> LLMAnswer:
-    """Call the endpoint once, falling back to `json_object` when needed."""
+    """Call the endpoint, shedding fields the server rejects.
+
+    Servers vary: some know only `json_object`, and some reject the optional
+    `reasoning_effort`. Each fallback is tried once, so a normal call is still
+    a single request.
+    """
     limit = max_tokens or settings.llm_max_tokens
-    try:
-        response = await client.chat.completions.create(
-            model=model_id,
-            messages=messages,
-            temperature=temperature,
-            max_tokens=limit,
-            response_format=_schema(name, model),
-        )
-    except BadRequestError:
-        # Some compatible servers know only json_object (ADR-010).
-        fallback: ResponseFormatJSONObject = {"type": "json_object"}
-        response = await client.chat.completions.create(
-            model=model_id,
-            messages=messages,
-            temperature=temperature,
-            max_tokens=limit,
-            response_format=fallback,
-        )
-    return _answer(response)
+    schema = _schema(name, model)
+    fallback: ResponseFormatJSONObject = {"type": "json_object"}
+
+    attempts: list[tuple[ResponseFormatJSONSchema | ResponseFormatJSONObject, str | None]] = [
+        (schema, reasoning_effort)
+    ]
+    if reasoning_effort:
+        attempts.append((schema, None))
+    attempts.append((fallback, None))
+
+    last: BadRequestError | None = None
+    for response_format, effort in attempts:
+        extra = {"reasoning_effort": effort} if effort else None
+        try:
+            response = await client.chat.completions.create(
+                model=model_id,
+                messages=messages,
+                temperature=temperature,
+                max_tokens=limit,
+                response_format=response_format,
+                extra_body=extra,
+            )
+        except BadRequestError as exc:
+            last = exc
+            continue
+        return _answer(response)
+
+    assert last is not None
+    raise last
 
 
 def llm_status(exc: Exception) -> tuple[int, str, str]:

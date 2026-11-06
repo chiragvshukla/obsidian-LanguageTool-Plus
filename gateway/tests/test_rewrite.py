@@ -9,7 +9,7 @@ import httpx
 import pytest
 import respx
 from fastapi.testclient import TestClient
-from openai import APIConnectionError
+from openai import APIConnectionError, BadRequestError
 from pydantic import ValidationError
 
 from ltplus.config import Settings
@@ -31,6 +31,7 @@ class FakeLLM:
         self.calls = 0
         self.last_messages: list[dict[str, Any]] = []
         self.last_max_tokens: int | None = None
+        self.last_extra: dict[str, Any] | None = None
         self.reasoning = False
         self.chat = SimpleNamespace(completions=self)
 
@@ -38,6 +39,7 @@ class FakeLLM:
         self.calls += 1
         self.last_messages = kwargs.get("messages", [])
         self.last_max_tokens = kwargs.get("max_tokens")
+        self.last_extra = kwargs.get("extra_body")
         reply = self.replies.pop(0) if len(self.replies) > 1 else self.replies[0]
         if isinstance(reply, Exception):
             raise reply
@@ -223,6 +225,88 @@ def test_rewrite_reports_an_empty_reasoning_reply(client: TestClient, llm: FakeL
 
     assert response.status_code == 502
     assert response.json()["error"]["code"] == "llm_empty_answer"
+
+
+@respx.mock
+def test_rewrite_forwards_reasoning_effort(client: TestClient, llm: FakeLLM) -> None:
+    llm.replies = [completion(("ist", "war"))]
+    respx.post(CHECK_URL).mock(return_value=httpx.Response(200, json={"matches": []}))
+
+    response = client.post(
+        "/rewrite",
+        json={"text": "Das ist ein Test.", "language": "de-DE"},
+        headers={"X-LLM-Reasoning-Effort": "high"},
+    )
+
+    assert response.status_code == 200
+    assert llm.last_extra == {"reasoning_effort": "high"}
+
+
+@respx.mock
+def test_rewrite_drops_reasoning_effort_when_the_server_rejects_it(
+    client: TestClient, llm: FakeLLM
+) -> None:
+    rejected = BadRequestError(
+        "unknown field",
+        response=httpx.Response(400, request=httpx.Request("POST", LLM_URL)),
+        body=None,
+    )
+    llm.replies = [rejected, completion(("ist", "war"))]
+    respx.post(CHECK_URL).mock(return_value=httpx.Response(200, json={"matches": []}))
+
+    response = client.post(
+        "/rewrite",
+        json={"text": "Das ist ein Test.", "language": "de-DE"},
+        headers={"X-LLM-Reasoning-Effort": "low"},
+    )
+
+    assert response.status_code == 200
+    assert llm.calls == 2
+    assert llm.last_extra is None
+
+
+@respx.mock
+def test_rewrite_falls_back_to_json_object_mode(client: TestClient, llm: FakeLLM) -> None:
+    rejected = BadRequestError(
+        "unsupported response format",
+        response=httpx.Response(400, request=httpx.Request("POST", LLM_URL)),
+        body=None,
+    )
+    llm.replies = [rejected, completion(("ist", "war"))]
+    respx.post(CHECK_URL).mock(return_value=httpx.Response(200, json={"matches": []}))
+
+    response = post(client)
+
+    assert response.status_code == 200
+    assert llm.calls == 2
+
+
+@respx.mock
+def test_rewrite_uses_the_plugin_token_budget(client: TestClient, llm: FakeLLM) -> None:
+    llm.replies = [completion(("ist", "war"))]
+    respx.post(CHECK_URL).mock(return_value=httpx.Response(200, json={"matches": []}))
+
+    client.post(
+        "/rewrite",
+        json={"text": "Das ist ein Test.", "language": "de-DE"},
+        headers={"X-LLM-Max-Tokens": "8000"},
+    )
+
+    assert llm.last_max_tokens == 8000
+
+
+@respx.mock
+def test_truncation_retry_doubles_the_plugin_budget(client: TestClient, llm: FakeLLM) -> None:
+    llm.replies = [('{"changes": [', "length"), completion(("ist", "war"))]
+    respx.post(CHECK_URL).mock(return_value=httpx.Response(200, json={"matches": []}))
+
+    client.post(
+        "/rewrite",
+        json={"text": "Das ist ein Test.", "language": "de-DE"},
+        headers={"X-LLM-Max-Tokens": "8000"},
+    )
+
+    assert llm.last_max_tokens == 16000
 
 
 @respx.mock

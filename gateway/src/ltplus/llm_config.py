@@ -26,6 +26,14 @@ router = APIRouter()
 BASE_URL_HEADER = "X-LLM-Base-URL"
 API_KEY_HEADER = "X-LLM-API-Key"
 MODEL_HEADER = "X-LLM-Model"
+MAX_TOKENS_HEADER = "X-LLM-Max-Tokens"
+EFFORT_HEADER = "X-LLM-Reasoning-Effort"
+
+# A typo in the plugin must not ask the model for a million tokens.
+MIN_MAX_TOKENS = 256
+MAX_MAX_TOKENS = 65536
+
+EFFORT_LEVELS = ("low", "medium", "high")
 
 # Keep a few clients around when the user switches models. Keys include a hash
 # of the API key, so changing the key creates a fresh client.
@@ -43,6 +51,8 @@ class LLMTarget:
     base_url: str
     api_key: str
     model: str
+    max_tokens: int | None = None
+    reasoning_effort: str | None = None
 
 
 class ModelsRequest(BaseModel):
@@ -71,7 +81,27 @@ def resolve_target(request: Request, settings: Settings) -> LLMTarget:
     api_key = request.headers.get(API_KEY_HEADER, "").strip()
     if not request.headers.get(BASE_URL_HEADER, "").strip():
         api_key = api_key or settings.llm_api_key
-    return LLMTarget(base_url=base_url, api_key=api_key, model=model)
+
+    max_tokens: int | None = None
+    raw_tokens = request.headers.get(MAX_TOKENS_HEADER, "").strip()
+    if raw_tokens:
+        try:
+            max_tokens = int(raw_tokens)
+        except ValueError as exc:
+            raise LLMConfigError("LLM max tokens must be a whole number") from exc
+        max_tokens = max(MIN_MAX_TOKENS, min(max_tokens, MAX_MAX_TOKENS))
+
+    reasoning_effort = request.headers.get(EFFORT_HEADER, "").strip().lower() or None
+    if reasoning_effort is not None and reasoning_effort not in EFFORT_LEVELS:
+        raise LLMConfigError("LLM reasoning effort must be low, medium, or high")
+
+    return LLMTarget(
+        base_url=base_url,
+        api_key=api_key,
+        model=model,
+        max_tokens=max_tokens,
+        reasoning_effort=reasoning_effort,
+    )
 
 
 async def resolve_llm(request: Request, settings: Settings) -> tuple[AsyncOpenAI, LLMTarget]:

@@ -91,10 +91,17 @@ configure it in Obsidian, not in `.env`:
    (Ollama: `http://127.0.0.1:11434/v1`).
 3. **AI API key**: optional; stored in Obsidian's SecretStorage on this device.
 4. **AI model**: press **Refresh** to list the models, then pick one.
+5. **AI max response tokens**: optional. 4096 is enough for short rewrites;
+   long text and reasoning models may need 8192–32768. Leave it empty to use the
+   gateway default. If a rewrite reports that the model ran out of tokens, raise
+   this.
+6. **Reasoning effort**: optional. Low, Medium, or High for models that support
+   it; others ignore it. Higher effort needs a higher token budget.
 
-The plugin sends the endpoint, model, and key to the gateway with every AI
-request. If the base URL or model is empty, AI stays off and only LanguageTool
-runs. The gateway's `LLM_*` values remain the fallback for direct HTTP clients.
+The plugin sends the endpoint, model, key, token budget, and effort to the
+gateway with every AI request. If the base URL or model is empty, AI stays off
+and only LanguageTool runs. The gateway's `LLM_*` values remain the fallback for
+direct HTTP clients.
 
 > [!WARNING]
 > AI rewrites and checks are slow and depend on your hardware. Expect seconds

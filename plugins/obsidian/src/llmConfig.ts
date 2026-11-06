@@ -22,6 +22,12 @@ export function llmHeaders(
     "X-LLM-Base-URL": settings.llmBaseUrl!.trim(),
     "X-LLM-Model": settings.llmModel!.trim()
   };
+  if (settings.llmMaxTokens) {
+    headers["X-LLM-Max-Tokens"] = String(settings.llmMaxTokens);
+  }
+  if (settings.llmReasoningEffort) {
+    headers["X-LLM-Reasoning-Effort"] = settings.llmReasoningEffort;
+  }
   const secretName = settings.llmApiKeySecretName;
   if (requireApiVersion("1.11.4") && secretName) {
     const apiKey = app.secretStorage.getSecret(secretName);

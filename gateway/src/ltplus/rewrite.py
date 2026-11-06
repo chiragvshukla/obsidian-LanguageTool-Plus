@@ -45,7 +45,7 @@ MAX_SAFE_CHECKS = 12
 
 # A reply cut off at the token cap gets one retry with more room. The ceiling
 # stops a runaway model from asking for an unbounded budget.
-RETRY_MAX_TOKENS = 16384
+MAX_TOKENS_CEILING = 65536
 
 _TRUNCATED = (
     "The model ran out of tokens before finishing. Raise LLM_MAX_TOKENS or "
@@ -222,6 +222,7 @@ async def _generate(
     context_before: str = "",
     context_after: str = "",
     max_tokens: int | None = None,
+    reasoning_effort: str | None = None,
 ) -> LLMAnswer:
     """Call the endpoint once. Returns the reply and its shape metadata."""
     system = prompt
@@ -244,6 +245,7 @@ async def _generate(
         temperature,
         model_id,
         max_tokens,
+        reasoning_effort,
     )
 
 
@@ -259,6 +261,8 @@ async def _repair(
     categories: list[str] | None = None,
     context_before: str = "",
     context_after: str = "",
+    max_tokens: int | None = None,
+    reasoning_effort: str | None = None,
 ) -> LLMAnswer | None:
     """Ask once for the previous reply, reformatted as schema JSON."""
     messages: list[ChatCompletionMessageParam] = [
@@ -290,6 +294,8 @@ async def _repair(
             LLMOutput,
             temperature,
             model_id,
+            max_tokens=max_tokens,
+            reasoning_effort=reasoning_effort,
         )
     except (BadRequestError, APIConnectionError, APIStatusError) as exc:
         # The first call worked, so this is usually transient. Fall through to
@@ -560,6 +566,7 @@ async def rewrite(request: Request) -> Response:
         return JSONResponse(cached)
 
     lt = request.app.state.lt
+    base_tokens = target.max_tokens or settings.llm_max_tokens
     try:
         answer = await _generate(
             client,
@@ -573,6 +580,8 @@ async def rewrite(request: Request) -> Response:
             payload.categories,
             payload.context_before,
             payload.context_after,
+            max_tokens=base_tokens,
+            reasoning_effort=target.reasoning_effort,
         )
     except (BadRequestError, APIConnectionError, APIStatusError) as exc:
         status, code, message = llm_status(exc)
@@ -596,7 +605,8 @@ async def rewrite(request: Request) -> Response:
                 payload.categories,
                 payload.context_before,
                 payload.context_after,
-                min(settings.llm_max_tokens * 2, RETRY_MAX_TOKENS),
+                max_tokens=min(base_tokens * 2, MAX_TOKENS_CEILING),
+                reasoning_effort=target.reasoning_effort,
             )
         except (BadRequestError, APIConnectionError, APIStatusError) as exc:
             status, code, message = llm_status(exc)
@@ -625,6 +635,8 @@ async def rewrite(request: Request) -> Response:
             payload.categories,
             payload.context_before,
             payload.context_after,
+            max_tokens=base_tokens,
+            reasoning_effort=target.reasoning_effort,
         )
         if repaired is not None:
             answer = repaired

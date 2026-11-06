@@ -85,6 +85,10 @@ export interface LanguageToolPluginSettings {
   // even when the gateway has an `.env` default.
   llmBaseUrl?: string;
   llmModel?: string;
+  // Response budget and reasoning effort, sent per request. Undefined uses
+  // the gateway's defaults.
+  llmMaxTokens?: number;
+  llmReasoningEffort?: "low" | "medium" | "high";
   // SecretStorage secret holding the LLM API key (value never stored here).
   llmApiKeySecretName?: string;
   aiAutoCheck?: boolean;
@@ -973,6 +977,51 @@ export class LanguageToolSettingsTab extends PluginSettingTab {
                 .onClick(async () => {
                   await this.refreshAiModels();
                   this.rerender();
+                });
+            });
+          }
+        },
+        {
+          name: "AI max response tokens",
+          desc:
+            "Response budget in tokens. 4096 is enough for short rewrites. Long text and reasoning models may need 8192-32768; if a rewrite says the model ran out of tokens, raise this. Leave empty to use the gateway default.",
+          render: setting => {
+            setting.addText(text => {
+              const current = this.plugin.settings.llmMaxTokens;
+              text
+                .setPlaceholder("4096")
+                .setValue(current ? String(current) : "")
+                .onChange(async raw => {
+                  const value = raw.trim();
+                  const parsed = /^\d+$/.test(value) ? Number(value) : Number.NaN;
+                  this.plugin.settings.llmMaxTokens =
+                    Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+                  await this.plugin.saveSettings();
+                });
+              text.inputEl.type = "number";
+              text.inputEl.min = "256";
+              text.inputEl.max = "65536";
+            });
+          }
+        },
+        {
+          name: "Reasoning effort",
+          desc:
+            "How much the model may reason before answering. Only reasoning models honour this; others ignore it. Higher effort needs a higher response-token budget.",
+          render: setting => {
+            setting.addDropdown(dropdown => {
+              dropdown
+                .addOption("", "Default (server decides)")
+                .addOption("low", "Low")
+                .addOption("medium", "Medium")
+                .addOption("high", "High")
+                .setValue(this.plugin.settings.llmReasoningEffort ?? "")
+                .onChange(async value => {
+                  this.plugin.settings.llmReasoningEffort =
+                    value === "low" || value === "medium" || value === "high"
+                      ? value
+                      : undefined;
+                  await this.plugin.saveSettings();
                 });
             });
           }

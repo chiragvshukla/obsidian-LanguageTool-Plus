@@ -58,8 +58,9 @@ Both AI actions require "Enable AI features" and call `POST /rewrite`. They also
 require an **AI base URL** and an **AI model** in the plugin settings; with
 either empty, AI stays off and only LanguageTool runs. The model list comes from
 `POST /llm/models`, and the API key is read from Obsidian's SecretStorage and
-sent to the gateway as headers. Results are validated by the gateway before the
-plugin sees them.
+sent to the gateway as headers. The optional **AI max response tokens** and
+**Reasoning effort** settings are sent the same way. Results are validated by
+the gateway before the plugin sees them.
 
 - **Rewrite selection with AI** uses the note's mode. The review modal shows
   the original, the rewritten text with changed spans highlighted, and one

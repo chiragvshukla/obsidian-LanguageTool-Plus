@@ -100,6 +100,38 @@ def test_target_rejects_non_http_url(settings: Settings) -> None:
         resolve_target(request, settings)  # type: ignore[arg-type]
 
 
+def test_target_reads_token_budget_and_effort(settings: Settings) -> None:
+    request = SimpleNamespace(
+        headers={"X-LLM-Max-Tokens": "8000", "X-LLM-Reasoning-Effort": "HIGH"}
+    )
+    target = resolve_target(request, settings)  # type: ignore[arg-type]
+    assert target.max_tokens == 8000
+    assert target.reasoning_effort == "high"
+
+
+def test_target_clamps_token_budget(settings: Settings) -> None:
+    high = resolve_target(  # type: ignore[arg-type]
+        SimpleNamespace(headers={"X-LLM-Max-Tokens": "999999"}), settings
+    )
+    low = resolve_target(  # type: ignore[arg-type]
+        SimpleNamespace(headers={"X-LLM-Max-Tokens": "1"}), settings
+    )
+    assert high.max_tokens == 65536
+    assert low.max_tokens == 256
+
+
+def test_target_rejects_invalid_token_budget(settings: Settings) -> None:
+    request = SimpleNamespace(headers={"X-LLM-Max-Tokens": "many"})
+    with pytest.raises(LLMConfigError):
+        resolve_target(request, settings)  # type: ignore[arg-type]
+
+
+def test_target_rejects_unknown_effort(settings: Settings) -> None:
+    request = SimpleNamespace(headers={"X-LLM-Reasoning-Effort": "extreme"})
+    with pytest.raises(LLMConfigError):
+        resolve_target(request, settings)  # type: ignore[arg-type]
+
+
 @respx.mock
 def test_model_header_does_not_reuse_cached_rewrite(
     app_client: TestClient, fake_llm: FakeLLM

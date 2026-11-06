@@ -38,9 +38,13 @@ A client may override the endpoint, key, and model for one request:
 | `X-LLM-Base-URL` | `LLM_BASE_URL` |
 | `X-LLM-API-Key` | `LLM_API_KEY` |
 | `X-LLM-Model` | `LLM_MODEL` |
+| `X-LLM-Max-Tokens` | `LLM_MAX_TOKENS` (clamped to 256–65536) |
+| `X-LLM-Reasoning-Effort` | none; `low`, `medium`, or `high` |
 
 The Obsidian plugin uses these headers so its settings win over `.env`. Missing
 headers keep the gateway defaults, so the HTTP API stays usable on its own.
+Reasoning effort is sent as the `reasoning_effort` field and dropped for one
+retry if the endpoint rejects it; models that do not reason ignore it.
 Clients are cached by base URL and a hash of the key; the rewrite cache key also
 includes the model, so switching models never returns another model's result.
 

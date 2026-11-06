@@ -450,6 +450,26 @@ when `.env` has an LLM. API keys live in SecretStorage and do not sync. Settings
 without a model leave AI off. `/llm/models` accepts arbitrary http(s) URLs, which
 is fine for a localhost gateway but must not be exposed without authentication.
 
+## ADR-024 - Token budget and reasoning effort are per-request settings
+
+**Context:** reply length is model- and task-dependent. A short rewrite fits in
+4096 tokens, while long text or a reasoning model can spend the whole budget
+before writing an answer. The gateway had one `.env` value for every request.
+Reasoning models also differ in how much they think, and the endpoint serves
+several model families.
+
+**Decision:** the plugin sends `X-LLM-Max-Tokens` and `X-LLM-Reasoning-Effort`.
+The gateway clamps tokens to 256–65536 and accepts only `low`, `medium`, and
+`high` for effort. Effort is sent as the Chat Completions `reasoning_effort`
+field. When a server rejects it with `400`, the call is retried once without it,
+then with `json_object` if the schema format is also rejected. A reply cut off
+at the token cap is retried once with twice the budget, up to 65536.
+
+**Consequences:** empty settings keep the gateway defaults. Effort is opt-in
+because no OpenAI-compatible endpoint advertises support for it; servers that
+ignore the field simply behave as before. Every fallback is a `400`-only retry,
+so successful calls stay at one request.
+
 ## Phase 0 findings
 
 - LanguageTool: prebuilt image + bind-mounted `grammar_custom.xml` works; the

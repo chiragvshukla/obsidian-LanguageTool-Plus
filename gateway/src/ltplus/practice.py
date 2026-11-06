@@ -305,6 +305,8 @@ async def _llm_error(
     user_message: str,
     name: str,
     model: type[BaseModel],
+    max_tokens: int | None = None,
+    reasoning_effort: str | None = None,
 ) -> LLMAnswer | JSONResponse:
     messages: list[ChatCompletionMessageParam] = [
         {
@@ -315,7 +317,15 @@ async def _llm_error(
     ]
     try:
         return await chat_json(
-            client, settings, messages, name, model, temperature=0.2, model_id=model_id
+            client,
+            settings,
+            messages,
+            name,
+            model,
+            temperature=0.2,
+            model_id=model_id,
+            max_tokens=max_tokens,
+            reasoning_effort=reasoning_effort,
         )
     except (BadRequestError, APIConnectionError, APIStatusError) as exc:
         status, code, message = llm_status(exc)
@@ -380,6 +390,8 @@ async def score(request: Request) -> Response:
             _score_message(payload.text, payload.language, mode, facts, issues),
             "score",
             ScoreOutput,
+            target.max_tokens,
+            target.reasoning_effort,
         )
         if isinstance(answer, JSONResponse):
             return answer
@@ -397,6 +409,8 @@ async def score(request: Request) -> Response:
                 _section_message(chunk, payload.language, mode, index, len(chunks)),
                 "score",
                 ScoreOutput,
+                target.max_tokens,
+                target.reasoning_effort,
             )
             if isinstance(answer, JSONResponse):
                 return answer
@@ -413,6 +427,8 @@ async def score(request: Request) -> Response:
             _reduce_message(payload.language, mode, facts, issues, sections),
             "score-reduce",
             ScoreOutput,
+            target.max_tokens,
+            target.reasoning_effort,
         )
         if isinstance(answer, JSONResponse):
             return answer
@@ -468,6 +484,8 @@ async def topic(request: Request) -> Response:
         _topic_message(payload.language, mode),
         "topic",
         TopicOutput,
+        target.max_tokens,
+        target.reasoning_effort,
     )
     if isinstance(answer, JSONResponse):
         return answer
