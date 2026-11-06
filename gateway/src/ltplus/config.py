@@ -31,6 +31,8 @@ class Settings(BaseSettings):
     llm_timeout_seconds: float = 60.0
     llm_max_tokens: int = 4096
     llm_context_chars: int = 12000
+    # Long notes are graded section by section, then reduced to one report.
+    llm_score_max_chunks: int = 8
     llm_cache_size: int = 128
 
     # Gateway

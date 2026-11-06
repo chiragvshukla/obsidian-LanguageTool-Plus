@@ -160,8 +160,9 @@ Configure the plugin under **Settings → LanguageTool Integration**:
   the paragraph is sent as read-only context, so the advice fits the sentence;
   suggestions still cover only the checked sentence.
 - The status-bar **Aa** icon and the ribbon icon open the same menu: check the
-  document, switch writing mode, run the AI actions, toggle automatic checking,
-  and clear suggestions. The AI entries appear only while AI features are on.
+  document, switch writing mode, switch the dictionary pair, run the AI
+  actions, toggle automatic checking, and clear suggestions. The AI entries
+  appear only while AI features are on.
 
 Do not overwrite `data.json` when updating; it holds the plugin's settings and
 possibly credentials.
@@ -184,12 +185,16 @@ possibly credentials.
     review.
   - **Check selection with AI** — correctness pass using `neutral`, shown as
     normal underlines.
-  - **Check current paragraph with AI** — same pass on the paragraph around the
+  - **Check current paragraph with AI** - same pass on the paragraph around the
     cursor.
-  - **Score current note with AI** — opens a read-only report: exact word,
-    sentence, and LanguageTool counts, plus 1–5 grades for clarity, tone
+  - **Check whole document with AI** — splits the note into sections and checks
+    each one, stating how many model calls it will make. Frontmatter and
+    fenced code are skipped; notes over 20 sections are refused.
+  - **Score current note with AI** - opens a read-only report: exact word,
+    sentence, and LanguageTool counts, plus 1-5 grades for clarity, tone
     fit, vocabulary, and structure and up to three recommendations. One
-    LanguageTool pass and one model call; nothing is applied or stored.
+    LanguageTool pass; one model call for a short note, or one per section plus
+    one to combine for a long note. Nothing is applied or stored.
   - **Insert writing topic with AI** — inserts a practice topic and angle as a
     blockquote at the cursor in the current note.
 
@@ -201,7 +206,8 @@ code blocks are protected.
 
 Off by default and independent of the AI switch. In **Settings → LanguageTool →
 Dictionary**, turn on **Word meanings on hover**, pick a pair, then press
-**Download** once:
+**Download** once. The pair can also be switched from the ribbon/status menu
+without opening settings. The pairs are:
 
 | Pair | Shows |
 |---|---|

@@ -82,6 +82,12 @@ export class ScoreModal extends Modal {
       cls: "lt-score-mode",
       text: `Mode: ${this.modeLabel}`
     });
+    if ((this.result.chunks ?? 1) > 1) {
+      contentEl.createDiv({
+        cls: "lt-score-mode",
+        text: `Scored in ${this.result.chunks} sections; final grades combine the sections.`
+      });
+    }
     contentEl.createDiv({
       cls: "lt-score-facts",
       text: formatFacts(this.result.facts)

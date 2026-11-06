@@ -14,6 +14,7 @@ import { StateEffect } from "@codemirror/state";
 import QuickLRU from "quick-lru";
 import {
   DEFAULT_SETTINGS,
+  DICTIONARY_PAIRS,
   LanguageToolPluginSettings,
   LanguageToolSettingsTab,
   WRITING_MODES,
@@ -49,7 +50,9 @@ import { requestRewrite, RewriteChange, RewriteModal } from "./rewrite";
 import { ScoreModal, requestScore, requestTopic } from "./practice";
 import { formatTopic } from "./practiceHelpers";
 import { AI_AUTO_MAX_CHARS, changesToMatches, contextAround, paragraphAt, sentenceAt } from "./aiCheck";
-import { WritingModeModal } from "./modePicker";
+import { AI_DOC_MAX_CHUNKS, chunkDocument } from "./documentChunk";
+import { frontmatterEnd } from "./dictionaryHelpers";
+import { DictionaryPairModal, WritingModeModal } from "./modePicker";
 
 // Default SecretStorage secret name used when migrating an existing plaintext
 // key. Secret names must be lowercase alphanumeric with optional dashes.
@@ -415,6 +418,21 @@ export default class LanguageToolPlugin extends Plugin {
     });
 
     this.addCommand({
+      id: "ltai-check-document",
+      name: "Check whole document with AI",
+      editorCheckCallback: (checking, editor) => {
+        if (!this.settings.enableAIFeatures) {
+          return false;
+        }
+        if (checking) {
+          return editor.getValue().trim().length > 0;
+        }
+        this.runAIAction(this.checkDocumentWithAI(editor));
+        return true;
+      }
+    });
+
+    this.addCommand({
       id: "ltai-score-document",
       name: "Score current note with AI",
       editorCheckCallback: (checking, editor) => {
@@ -509,7 +527,11 @@ export default class LanguageToolPlugin extends Plugin {
   }
 
   private async scoreDocument(editor: Editor): Promise<void> {
-    const text = editor.getValue();
+    if (this.scoringOpen) {
+      return;
+    }
+    const snapshot = editor.getValue();
+    const text = snapshot.slice(frontmatterEnd(snapshot));
     if (!text.trim()) {
       new Notice("Nothing to score");
       return;
@@ -578,6 +600,119 @@ export default class LanguageToolPlugin extends Plugin {
     if (count > 0) {
       message = `AI found ${count} suggestion${count === 1 ? "" : "s"}`;
     } else if (changes.length > 0) {
+      message = "AI suggestions could not be shown inline";
+    }
+    new Notice(message, 4000);
+  }
+
+  /**
+   * Explicit whole-document pass. Split into sections on paragraph/sentence
+   * boundaries, ask for each section, then draw all underlines only after
+   * every call succeeded and the note is unchanged.
+   */
+  private async checkDocumentWithAI(editor: Editor): Promise<void> {
+    if (!this.settings.enableAIFeatures || this.scoringOpen) {
+      return;
+    }
+    const snapshot = editor.getValue();
+    const body = snapshot.slice(frontmatterEnd(snapshot));
+    if (!body.trim()) {
+      new Notice("Nothing to check");
+      return;
+    }
+
+    const chunks = chunkDocument(snapshot);
+    if (chunks.length === 0) {
+      new Notice("Nothing to check");
+      return;
+    }
+    if (chunks.length > AI_DOC_MAX_CHUNKS) {
+      new Notice(
+        `Note needs ${chunks.length} AI sections; the limit is ${AI_DOC_MAX_CHUNKS}. Check a selection instead.`,
+        8000
+      );
+      return;
+    }
+
+    const file = this.app.workspace.getActiveFile();
+    const mode =
+      getDocumentMode(this.app, file) ?? this.settings.writingMode ?? "neutral";
+    const language = await this.getRewriteLanguage(body.slice(0, 500));
+    const categories = this.getAiCategories();
+
+    const notice = new Notice(
+      `AI document check: ${chunks.length} model call${
+        chunks.length === 1 ? "" : "s"
+      }`,
+      0
+    );
+    this.setStatusBarWorking();
+    const results: {
+      from: number;
+      text: string;
+      changes: RewriteChange[];
+    }[] = [];
+
+    try {
+      for (let index = 0; index < chunks.length; index += 1) {
+        const chunk = chunks[index];
+        notice.setMessage(
+          `AI document check ${index + 1}/${chunks.length}`
+        );
+        const result = await requestRewrite(
+          this.settings,
+          chunk.text,
+          language,
+          mode,
+          categories,
+          {
+            before: snapshot.slice(Math.max(0, chunk.from - 500), chunk.from),
+            after: snapshot.slice(
+              chunk.to,
+              Math.min(snapshot.length, chunk.to + 500)
+            )
+          }
+        );
+        results.push({ from: chunk.from, text: chunk.text, changes: result.changes });
+      }
+    } catch (e) {
+      notice.hide();
+      this.setStatusBarReady();
+      throw new Error(
+        `AI document check stopped at section ${results.length + 1}/${
+          chunks.length
+        }: ${e instanceof Error ? e.message : String(e)}`
+      );
+    }
+
+    notice.hide();
+    this.setStatusBarReady();
+
+    if (editor.getValue() !== snapshot) {
+      new Notice(
+        "AI document check discarded: the note changed while checking",
+        6000
+      );
+      return;
+    }
+
+    const view = editorToCodeMirror(editor);
+    let count = 0;
+    let total = 0;
+    for (const result of results) {
+      total += result.changes.length;
+      count += this.addAIUnderlines(
+        view,
+        result.from,
+        result.text,
+        result.changes
+      );
+    }
+
+    let message = "AI found no issues";
+    if (count > 0) {
+      message = `AI found ${count} suggestion${count === 1 ? "" : "s"}`;
+    } else if (total > 0) {
       message = "AI suggestions could not be shown inline";
     }
     new Notice(message, 4000);
@@ -919,6 +1054,12 @@ export default class LanguageToolPlugin extends Plugin {
         item.setIcon("type");
         item.onClick(() => this.openWritingModePicker());
       })
+      .addItem(item => {
+        const pair = this.settings.dictionaryPair ?? "de-de";
+        item.setTitle(`Dictionary: ${DICTIONARY_PAIRS[pair]}`);
+        item.setIcon("book-open");
+        item.onClick(() => this.openDictionaryPairPicker());
+      })
       .addSeparator();
 
     if (this.settings.enableAIFeatures) {
@@ -949,6 +1090,15 @@ export default class LanguageToolPlugin extends Plugin {
           this.runAIAction(
             this.checkParagraphWithAI(editorToCodeMirror(editor), true)
           );
+        });
+      });
+      menu.addItem(item => {
+        item.setTitle("Check whole document with AI");
+        item.setIcon("sparkles");
+        item.setDisabled(!editor || !editor.getValue().trim());
+        item.onClick(() => {
+          if (!editor) return;
+          this.runAIAction(this.checkDocumentWithAI(editor));
         });
       });
       menu.addSeparator();
@@ -1025,6 +1175,18 @@ export default class LanguageToolPlugin extends Plugin {
         this.settings.writingMode = mode;
         void this.saveSettings().catch(e => console.error(e));
         new Notice(`Writing mode: ${WRITING_MODES[mode]}`, 2000);
+      }
+    ).open();
+  }
+
+  private openDictionaryPairPicker(): void {
+    new DictionaryPairModal(
+      this.app,
+      this.settings.dictionaryPair,
+      pair => {
+        this.settings.dictionaryPair = pair;
+        void this.saveSettings().catch(e => console.error(e));
+        new Notice(`Dictionary: ${DICTIONARY_PAIRS[pair]}`, 2000);
       }
     ).open();
   }

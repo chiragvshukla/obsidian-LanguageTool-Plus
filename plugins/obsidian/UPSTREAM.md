@@ -35,12 +35,21 @@ unmodified upstream files except where listed below. The upstream `test/` and
      `style` changes get the `STYLE` category (purple), `vocabulary` gets
      `VOCABULARY` (blue), others `GRAMMAR`.
    - `src/index.ts`: added "Rewrite selection with AI", "Check selection with
-     AI", and "Check current paragraph with AI". All are hidden unless
-     `enableAIFeatures` is on; the checks use the note's resolved writing mode.
-     The status-bar menu and the ribbon icon open one shared menu with the
-     checks, AI actions, and a writing-mode picker.
-   - `src/modePicker.ts`: new. `FuzzySuggestModal` over `WRITING_MODES` for the
-     shared menu; it writes `settings.writingMode`.
+     AI", "Check current paragraph with AI", "Check whole document with AI",
+     "Score current note with AI", and "Insert writing topic with AI". All are
+     hidden unless `enableAIFeatures` is on; the checks use the note's resolved
+     writing mode. The status-bar menu and the ribbon icon open one shared menu
+     with the checks, AI actions, writing-mode picker, and dictionary-pair
+     picker.
+   - `src/documentChunk.ts`: new. Splits the note body into sections of at most
+     8,000 characters on paragraph then sentence boundaries, skipping
+     frontmatter and fenced code, so the whole-document check stays within the
+     gateway's context budget.
+   - `src/practice.ts` and `src/practiceHelpers.ts`: new. Read-only score modal
+     over `POST /score`, topic insertion over `POST /topic`, and the pure
+     formatting helpers for both.
+   - `src/modePicker.ts`: new. `FuzzySuggestModal` over `WRITING_MODES` and
+     `DICTIONARY_PAIRS` for the shared menu; each writes its setting.
    - `src/cm6/buildAutoCheckHandler.ts`: optional 4-second sentence check
      when `aiAutoCheck` is on. Cursor-only updates do not cancel it; the cursor
      is read when the pause ends, and edits invalidate the result.
@@ -86,6 +95,6 @@ with any build you share.
 
 ## Upstream updates
 
-Copy the new upstream tree over this directory, then re-apply the three
-changes above. Keep the format of this file: update the commit and date. Never
+Copy the new upstream tree over this directory, then re-apply the changes
+above. Keep the format of this file: update the commit and date. Never
 add the plugin as a git submodule.

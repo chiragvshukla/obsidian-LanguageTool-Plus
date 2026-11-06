@@ -325,6 +325,34 @@ git. Without a lemma tagger the alias index can be patchy for unusual forms;
 the cap of five aliases per form keeps homograph groups bounded. The indexes
 load lazily per pair, so a cold first hover can pause briefly.
 
+## ADR-020 — Chunk long text on paragraph boundaries; score with map + reduce
+
+**Status:** accepted
+
+**Context:** the local model has a character budget (`LLM_CONTEXT_CHARS`,
+12,000), while notes can be much longer. Two features now need long text:
+whole-document AI checking and scoring a whole note. Blindly slicing on
+characters breaks sentences and offsets; grading a long note in one call
+exceeds the budget, and averaging independent section grades would hide how
+the sections interact.
+
+**Decision:** split text on blank-line paragraph boundaries, then sentence
+ends, then a hard slice, so every section fits the budget. The plugin does this
+for whole-document checks (`documentChunk.ts`) because it needs progress and
+local offsets. The gateway does the same for `/score` (`chunk_text`) because
+the report is aggregated there. `/score` computes facts and LanguageTool
+findings once over the whole text, then grades each section and makes one
+reduce call that receives the facts and the section results. Notes within the
+budget keep the single-call path. Scoring is capped at
+`LLM_SCORE_MAX_CHUNKS` (default 8); whole-document checking at 20 sections.
+Rewriting remains selection-only.
+
+**Consequences:** a long note costs N + 1 model calls to score and one call per
+section to check, so both commands state the count before starting. Facts stay
+exact and are never split. The two chunkers must stay in sync; both carry a
+comment saying so. If the model handles long context better later, the chunk
+size can rise without changing either endpoint.
+
 ## ADR-019 — The score separates measured facts from model judgement
 
 **Status:** accepted

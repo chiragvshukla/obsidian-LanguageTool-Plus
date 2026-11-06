@@ -76,6 +76,13 @@ are validated by the gateway before the plugin sees them.
 - **Check current paragraph with AI** runs the same pass on the paragraph around
   the cursor, without needing a selection. It reports its result or error in a
   notice and works even when automatic checking is off.
+- **Check whole document with AI** splits the note body on paragraph, then
+  sentence boundaries into sections of at most 8,000 characters, skips
+  frontmatter and fenced code, and calls `POST /rewrite` once per section. It
+  shows the section count before the first call and progress while it runs.
+  Underlines are drawn only after every section succeeds and the note is
+  unchanged. A note that needs more than 20 sections is refused; check a
+  selection instead. Rewrite stays selection-only.
 - **AI auto-check current sentence** is a separate, default-off toggle. After
   4 seconds without typing it checks the sentence around the cursor (at most
   2,000 characters). The rest of the paragraph is sent as `context_before` /
@@ -89,28 +96,33 @@ are validated by the gateway before the plugin sees them.
   stays instant and independent, and an LT check now clears only its own
   underlines, so an automatic LT pass cannot wipe visible AI hints.
 - The status-bar **Aa** icon and the ribbon icon open the same menu: check the
-  document, switch writing mode, run the AI actions, toggle automatic checking,
-  and clear suggestions. AI entries are hidden while AI features are off;
-  selection actions stay disabled without a selection.
+  document, switch writing mode, switch the dictionary pair, run the AI
+  actions, toggle automatic checking, and clear suggestions. AI entries are
+  hidden while AI features are off; selection actions stay disabled without a
+  selection.
 - The three AI category toggles (grammar, style, vocabulary) are sent as
   `categories` on every `/rewrite` call. All on is the default and sends no
   list. Switching one off is enforced by the gateway, not only hidden by the
   plugin.
 
-- **Score current note with AI** calls `POST /score` once. The gateway makes
-  one `/v2/check` call for exact word, sentence, and category counts, then one
-  model call for 1–5 grades (clarity, tone fit, vocabulary, structure) and up
-  to three recommendations. The modal is read-only and nothing is cached.
-  While it is open, automatic LT and AI checks are suppressed so the note
-  cannot change underneath the report. A note longer than
-  `LLM_CONTEXT_CHARS` returns `413 text_too_long`; shorten it to score it.
+- **Score current note with AI** calls `POST /score` once with the note body
+  (frontmatter removed). The gateway makes one `/v2/check` call for exact word,
+  sentence, and category counts. A note within `LLM_CONTEXT_CHARS` uses one
+  model call; a longer note is graded section by section and one reduce call
+  produces the final 1–5 grades (clarity, tone fit, vocabulary, structure) and
+  up to three recommendations. The modal is read-only, states how many
+  sections were used, and nothing is cached. While it is open, automatic LT
+  and AI checks are suppressed so the note cannot change underneath the report.
+  Notes over `LLM_SCORE_MAX_CHUNKS × LLM_CONTEXT_CHARS` return
+  `413 text_too_long`.
 - **Insert writing topic with AI** calls `POST /topic` and inserts the result
   at the cursor as a blockquote (`Writing prompt` and `Angle` lines). Topics
   may repeat across sessions; nothing is stored.
 
 The model is slower than LanguageTool (seconds, not milliseconds), so AI
-auto-check is opt-in and scoped to one sentence. Explicit commands have no
-such cap beyond the gateway's `LLM_CONTEXT_CHARS`.
+auto-check is opt-in and scoped to one sentence. Explicit commands state their
+call count; a long note costs one call per section (plus one reduce call when
+scoring).
 
 ## Hover dictionary
 
@@ -148,7 +160,11 @@ Implemented:
 8. The local hover dictionary: settings, download status, and a CM6 hover
    tooltip backed by the gateway.
 9. Writing practice: a read-only score report (`POST /score`) and blockquote
-   topic insertion (`POST /topic`).
+   topic insertion (`POST /topic`). Long notes score with map + reduce.
+10. Whole-document AI checking with paragraph/sentence chunking, progress, and
+    a call-count notice. Rewrite stays selection-only.
+11. Dictionary pair selection in the shared ribbon/status menu, and a readable
+    hover tooltip in both themes.
 
 Do not modify the upstream request shape otherwise. Record the upstream commit
 in `plugins/obsidian/UPSTREAM.md` and keep the AGPL-3.0 license.

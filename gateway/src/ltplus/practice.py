@@ -27,7 +27,7 @@ from ltplus.rewrite import PromptError
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-PRACTICE_PROMPTS = ("score", "topic")
+PRACTICE_PROMPTS = ("score", "score-reduce", "topic")
 
 
 class ScoreGrades(BaseModel):
@@ -96,6 +96,65 @@ def _mode(request: Request, mode_id: str | None) -> Mode | JSONResponse:
     if mode is None:
         return _error(400, "unknown_mode", f"Unknown mode: {selected}")
     return mode
+
+
+def _split_block(block: str, limit: int) -> list[str]:
+    """Split an oversized paragraph on sentence ends, then hard at `limit`."""
+    pieces: list[str] = []
+    current = ""
+    for sentence in re.split(r"(?<=[.!?])\s+", block):
+        if len(sentence) > limit:
+            if current:
+                pieces.append(current)
+                current = ""
+            pieces.extend(
+                sentence[index : index + limit]
+                for index in range(0, len(sentence), limit)
+            )
+        elif not current:
+            current = sentence
+        elif len(current) + 1 + len(sentence) <= limit:
+            current = f"{current} {sentence}"
+        else:
+            pieces.append(current)
+            current = sentence
+    if current:
+        pieces.append(current)
+    return pieces
+
+
+def chunk_text(text: str, limit: int) -> list[str]:
+    """Split text into sections that never exceed `limit`.
+
+    Paragraph boundaries come first, then sentence boundaries, then a hard
+    split so a single unbroken run still fits. The plugin uses the same rules
+    in TypeScript for whole-document checks; keep the two in sync.
+    """
+    if len(text) <= limit:
+        return [text]
+
+    pieces: list[str] = []
+    for block in (part.strip() for part in re.split(r"\n\s*\n", text)):
+        if not block:
+            continue
+        if len(block) <= limit:
+            pieces.append(block)
+        else:
+            pieces.extend(_split_block(block, limit))
+
+    chunks: list[str] = []
+    current = ""
+    for piece in pieces:
+        candidate = f"{current}\n\n{piece}" if current else piece
+        if len(candidate) <= limit:
+            current = candidate
+        else:
+            if current:
+                chunks.append(current)
+            current = piece
+    if current:
+        chunks.append(current)
+    return chunks or [text]
 
 
 def _facts(text: str) -> dict[str, Any]:
@@ -190,6 +249,52 @@ def _score_message(
     )
 
 
+def _section_message(
+    text: str, language: str, mode: Mode, index: int, total: int
+) -> str:
+    return (
+        f"Text section:\n<<<\n{text}\n>>>\n\n"
+        f"Language: {language}\n"
+        f"Writing mode: {mode.id} - {mode.description or mode.label}\n"
+        f"This is section {index} of {total} of one longer text. Grade this "
+        "section on its own: clarity, tone fit to the mode, vocabulary, and "
+        "structure from 1 to 5, where 5 is best. Give at most three concrete "
+        "recommendations for this section in the text's language. Do not "
+        "rewrite the text."
+    )
+
+
+def _reduce_message(
+    language: str,
+    mode: Mode,
+    facts: dict[str, Any],
+    issues: list[dict[str, Any]],
+    sections: list[ScoreOutput],
+) -> str:
+    issue_text = ", ".join(f"{item['category']}: {item['count']}" for item in issues) or "none"
+    lines = [
+        f"Language: {language}",
+        f"Writing mode: {mode.id} - {mode.description or mode.label}",
+        f"Measured facts for the whole text: {facts['words']} words, "
+        f"{facts['sentences']} sentences, {facts['averageSentenceWords']} words per sentence.",
+        f"LanguageTool findings: {issue_text}.",
+        "Section results:",
+    ]
+    for index, section in enumerate(sections, start=1):
+        grades = ", ".join(
+            f"{key}={value}" for key, value in section.grades.model_dump().items()
+        )
+        notes = " | ".join(section.recommendations) or "none"
+        lines.append(f"{index}. grades: {grades}; notes: {notes}")
+    lines.append(
+        "Combine these section results into final grades for the whole text and at most "
+        "three concrete recommendations in the text's language. Use the measured facts "
+        "and LanguageTool findings as context but do not invent numbers. Do not rewrite "
+        "the text."
+    )
+    return "\n".join(lines)
+
+
 def _topic_message(language: str, mode: Mode) -> str:
     return (
         f"Language: {language}\n"
@@ -198,6 +303,14 @@ def _topic_message(language: str, mode: Mode) -> str:
         "one-sentence angle that says what to focus on. Write both in the text's "
         "language. Keep the topic under 120 characters."
     )
+
+
+def _parse_score(content: str, label: str) -> ScoreOutput | JSONResponse:
+    try:
+        return ScoreOutput.model_validate(json.loads(content))
+    except (json.JSONDecodeError, ValidationError) as exc:
+        logger.warning("%s rejected: %s", label, exc)
+        return _error(502, "llm_validation_failed", "The model returned an invalid score")
 
 
 async def _llm_error(
@@ -239,14 +352,19 @@ async def score(request: Request) -> Response:
     mode = _mode(request, payload.mode)
     if isinstance(mode, JSONResponse):
         return mode
-    prompt = prompts.get((payload.language.split("-")[0], "score"))
-    if prompt is None:
+    language = payload.language.split("-")[0]
+    prompt = prompts.get((language, "score"))
+    reduce_prompt = prompts.get((language, "score-reduce"))
+    if prompt is None or reduce_prompt is None:
         return _error(400, "unsupported_language", f"No score prompt for {payload.language}")
-    if len(payload.text) > settings.llm_context_chars:
+
+    chunks = chunk_text(payload.text, settings.llm_context_chars)
+    if len(chunks) > settings.llm_score_max_chunks:
         return _error(
             413,
             "text_too_long",
-            f"Text exceeds {settings.llm_context_chars} characters; shorten the note or selection",
+            f"Text needs {len(chunks)} sections; the limit is "
+            f"{settings.llm_score_max_chunks}",
         )
 
     try:
@@ -255,22 +373,52 @@ async def score(request: Request) -> Response:
         return _error(503, "languagetool_unavailable", "LanguageTool is not reachable")
 
     facts = _facts(payload.text)
-    content = await _llm_error(
-        request.app.state.llm,
-        settings,
-        prompt,
-        _score_message(payload.text, payload.language, mode, facts, issues),
-        "score",
-        ScoreOutput,
-    )
-    if isinstance(content, JSONResponse):
-        return content
 
-    try:
-        parsed = ScoreOutput.model_validate(json.loads(content))
-    except (json.JSONDecodeError, ValidationError) as exc:
-        logger.warning("score rejected: %s", exc)
-        return _error(502, "llm_validation_failed", "The model returned an invalid score")
+    if len(chunks) == 1:
+        content = await _llm_error(
+            request.app.state.llm,
+            settings,
+            prompt,
+            _score_message(payload.text, payload.language, mode, facts, issues),
+            "score",
+            ScoreOutput,
+        )
+        if isinstance(content, JSONResponse):
+            return content
+        parsed = _parse_score(content, "score")
+        if isinstance(parsed, JSONResponse):
+            return parsed
+    else:
+        sections: list[ScoreOutput] = []
+        for index, chunk in enumerate(chunks, start=1):
+            content = await _llm_error(
+                request.app.state.llm,
+                settings,
+                prompt,
+                _section_message(chunk, payload.language, mode, index, len(chunks)),
+                "score",
+                ScoreOutput,
+            )
+            if isinstance(content, JSONResponse):
+                return content
+            section = _parse_score(content, f"score section {index}/{len(chunks)}")
+            if isinstance(section, JSONResponse):
+                return section
+            sections.append(section)
+
+        content = await _llm_error(
+            request.app.state.llm,
+            settings,
+            reduce_prompt,
+            _reduce_message(payload.language, mode, facts, issues, sections),
+            "score-reduce",
+            ScoreOutput,
+        )
+        if isinstance(content, JSONResponse):
+            return content
+        parsed = _parse_score(content, "score reduce")
+        if isinstance(parsed, JSONResponse):
+            return parsed
 
     recommendations = [item.strip() for item in parsed.recommendations if item.strip()][:3]
     return JSONResponse(
@@ -278,6 +426,8 @@ async def score(request: Request) -> Response:
             "facts": {**facts, "ltIssues": issues},
             "grades": parsed.grades.model_dump(),
             "recommendations": recommendations,
+            "chunks": len(chunks),
+            "method": "direct" if len(chunks) == 1 else "map_reduce",
         }
     )
 

@@ -18,13 +18,13 @@ import { fetchDictionaryStatus } from "./cm6/dictionaryHover";
 import { describeDictionaryStatus } from "./dictionaryHelpers";
 import { normalizeServerUrl } from "./helpers";
 
-const DICTIONARY_PAIRS = {
+export const DICTIONARY_PAIRS = {
   "de-de": "German – German",
   "en-de": "English → German",
   "de-en": "German → English"
 } as const;
 
-type DictionaryPair = keyof typeof DICTIONARY_PAIRS;
+export type DictionaryPair = keyof typeof DICTIONARY_PAIRS;
 
 const MinuteInSeconds = 60;
 const SecondToMillisecondConversion = 1000;

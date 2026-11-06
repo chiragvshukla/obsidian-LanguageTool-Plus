@@ -12,7 +12,7 @@ from openai import APIConnectionError
 
 from ltplus.config import Settings
 from ltplus.main import create_app
-from ltplus.practice import PromptError, load_practice_prompts
+from ltplus.practice import PromptError, chunk_text, load_practice_prompts
 
 MODES_DIR = Path(__file__).resolve().parents[2] / "modes"
 PROMPTS_DIR = Path(__file__).resolve().parents[2] / "prompts"
@@ -98,6 +98,8 @@ def test_score_combines_facts_with_model_grades(client: TestClient, llm: FakeLLM
     }
     assert body["grades"] == SCORE["grades"]
     assert body["recommendations"] == SCORE["recommendations"]
+    assert body["chunks"] == 1
+    assert body["method"] == "direct"
     assert llm.calls == 1
     assert "formal" in llm.last_messages[1]["content"]
 
@@ -138,10 +140,58 @@ def test_score_rejects_unknown_mode(client: TestClient) -> None:
     assert response.json()["error"]["code"] == "unknown_mode"
 
 
-def test_score_rejects_long_text(client: TestClient) -> None:
-    response = client.post("/score", json={"text": "x" * 20000})
+def test_score_rejects_text_beyond_the_chunk_limit(client: TestClient) -> None:
+    response = client.post("/score", json={"text": "x" * 100000})
 
     assert response.status_code == 413
+    assert response.json()["error"]["code"] == "text_too_long"
+
+
+@respx.mock
+def test_score_uses_map_reduce_for_long_text(client: TestClient, llm: FakeLLM) -> None:
+    text = "Ein Satz. " * 1300
+    chunks = chunk_text(text, 12000)
+    assert len(chunks) > 1
+    section = {
+        "grades": {"clarity": 1, "tone": 1, "vocabulary": 1, "structure": 1},
+        "recommendations": ["section note"],
+    }
+    final = {
+        "grades": {"clarity": 5, "tone": 4, "vocabulary": 3, "structure": 2},
+        "recommendations": ["final one", "final two", "final three", "ignored"],
+    }
+    llm.replies = [json.dumps(section)] * len(chunks) + [json.dumps(final)]
+    route = respx.post(CHECK_URL).mock(
+        return_value=httpx.Response(200, json={"matches": []})
+    )
+
+    response = client.post("/score", json={"text": text, "language": "de-DE"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["chunks"] == len(chunks)
+    assert body["method"] == "map_reduce"
+    assert body["grades"] == final["grades"]
+    assert body["recommendations"] == ["final one", "final two", "final three"]
+    assert body["facts"]["words"] == len(text.split())
+    assert route.call_count == 1
+    assert llm.calls == len(chunks) + 1
+
+
+def test_chunk_text_splits_on_boundaries_within_limit() -> None:
+    text = "Erster Satz. Zweiter Satz.\n\nDritter Absatz."
+
+    chunks = chunk_text(text, 25)
+
+    assert chunks
+    assert all(chunk.strip() and len(chunk) <= 25 for chunk in chunks)
+    assert " ".join(chunks).split() == text.split()
+
+
+def test_chunk_text_hard_splits_unbroken_text() -> None:
+    chunks = chunk_text("x" * 50, 20)
+
+    assert [len(chunk) for chunk in chunks] == [20, 20, 10]
 
 
 def test_topic_rejects_unsupported_language(client: TestClient) -> None:

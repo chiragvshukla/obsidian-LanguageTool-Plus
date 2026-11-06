@@ -21,6 +21,8 @@ export interface ScoreResult {
   facts: ScoreFacts;
   grades: ScoreGrades;
   recommendations: string[];
+  chunks?: number;
+  method?: "direct" | "map_reduce";
 }
 
 export interface TopicResult {
