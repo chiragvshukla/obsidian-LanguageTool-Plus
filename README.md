@@ -12,12 +12,13 @@ It combines three open parts:
 - An OpenAI-compatible **LLM** for style and fluency work. Ollama is the local
   default; any compatible endpoint works.
 
-The optional Obsidian plugin fork adds per-note modes and a rewrite command.
-The upstream plugin already works against the gateway in pass-through mode.
+The Obsidian plugin is vendored under `plugins/obsidian/` with an "Enable AI
+features" switch (off by default) and a rewrite command. The upstream plugin
+also works against the gateway in pass-through mode.
 
-> **Status:** Phase 3. The gateway proxies `/v2/check` and `/v2/languages`,
-> applies writing modes, and serves `POST /rewrite`. Inline AI suggestions
-> follow `docs/PLAN.md`.
+> **Status:** Phase 3 plus the plugin fork's AI switch and rewrite command. The
+> gateway proxies `/v2/check` and `/v2/languages`, applies writing modes, and
+> serves `POST /rewrite`. Inline AI suggestions follow `docs/PLAN.md`.
 
 ## Requirements
 
@@ -58,9 +59,11 @@ Invoke-RestMethod http://127.0.0.1:8077/rewrite `
   -Body '{"text":"Das ist ein Tset.","language":"de-DE","mode":"formal"}'
 ```
 
-In Obsidian, install the LanguageTool plugin and set its endpoint to
+In Obsidian, install the plugin from `plugins/obsidian/` (see
+`plugins/obsidian/UPSTREAM.md` for the build) and set its endpoint to
 `http://127.0.0.1:8077` (the plugin appends `/v2` itself). Port `8010` is
-LanguageTool directly and does not apply writing modes.
+LanguageTool directly and does not apply writing modes. Enable "AI features"
+in the plugin settings to unlock "Rewrite selection with AI".
 
 ## Configuration
 
