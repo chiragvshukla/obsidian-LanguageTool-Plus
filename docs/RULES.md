@@ -1,6 +1,6 @@
 # Adding words and rules
 
-Three places extend what LanguageTool finds. None of them requires rebuilding
+Four places extend what LanguageTool finds. None of them requires rebuilding
 the container.
 
 ## Personal dictionary
@@ -62,6 +62,37 @@ it at startup.
 
 Check that a rule does not fire on correct text before relying on it. The
 `rules/grammar_custom.xml` file ships with one working rule as a template.
+
+## Dormant LanguageTool rules (`modes/*.yaml`)
+
+Some German rules ship in LanguageTool but are disabled by default. Modes turn
+them on with `enabled_rules`; the gateway forwards them as `enabledRules`.
+
+```yaml
+enabled_rules:
+  - DAS_DASS
+  - LG
+disabled_rules:      # optional; turns a default-on rule off
+  - PASSIVE_VOICE
+```
+
+- Rule IDs are LanguageTool IDs, uppercase, group IDs included.
+- A rule both enabled and disabled in one mode is a startup error.
+- Rules come from the `default="off"` nodes in LanguageTool's German
+  `grammar.xml` and `style.xml`. Rules marked `temp_off` are intentionally
+  skipped: upstream disabled them for known false alarms.
+- `neutral` and `casual` get correctness rules only. `formal` and `business`
+  add correspondence, style, and recommended-spelling rules. `academic` adds
+  correctness and recommended spelling but no colloquialisms or letter
+  formulas.
+- The client still wins: `disabledRules` removes a mode rule, and
+  `enabledOnly=true` uses only the client's lists.
+- Restart the gateway after editing a mode.
+
+Not enabled, on purpose: `TEST_*` rules, rules whose examples no longer fire
+(`IMP_AUX_SPELLING_RULE`, `ZWEI_UND_VIERZIG`, `AUSGESCHRIEBENE_ZAHLEN`,
+`TYPOGRAFISCHES_ZOLLZEICHEN`), the optional-comma hints, and the ambiguous
+`SIE_ANREDE`/`SIE_KEINE_ANREDE` pair.
 
 ## Quick verification
 

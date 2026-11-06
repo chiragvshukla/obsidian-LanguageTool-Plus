@@ -30,6 +30,27 @@ def test_loads_yml_extension(tmp_path: Path) -> None:
     assert modes["formal"].level == "picky"
 
 
+def test_loads_rule_lists(tmp_path: Path) -> None:
+    (tmp_path / "formal.yaml").write_text(
+        VALID + "enabled_rules: [LG, DAS_DASS]\ndisabled_rules: [PASSIVE_VOICE]\n",
+        encoding="utf-8",
+    )
+
+    mode = load_modes(tmp_path)["formal"]
+
+    assert mode.enabled_rules == ["LG", "DAS_DASS"]
+    assert mode.disabled_rules == ["PASSIVE_VOICE"]
+
+
+def test_rejects_rule_enabled_and_disabled(tmp_path: Path) -> None:
+    (tmp_path / "formal.yaml").write_text(
+        VALID + "enabled_rules: [LG]\ndisabled_rules: [LG]\n", encoding="utf-8"
+    )
+
+    with pytest.raises(ModeConfigError, match="both enabled and disabled"):
+        load_modes(tmp_path)
+
+
 def test_rejects_id_mismatch(tmp_path: Path) -> None:
     (tmp_path / "other.yaml").write_text(VALID, encoding="utf-8")
 

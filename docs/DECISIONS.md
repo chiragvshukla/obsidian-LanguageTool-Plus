@@ -137,11 +137,15 @@ mode must influence checks without silently discarding the user's settings.
 
 **Decision:** `picky` wins if either side asks for it. Disabled categories are
 unioned; enabled categories are intersected when both sides provide a list.
-A category disabled on either side is never re-enabled.
+A category disabled on either side is never re-enabled. Mode `enabled_rules`
+are unioned with the client's, while a client `disabledRules` entry always
+wins. When the client sends `enabledOnly=true`, the mode adds nothing and
+disabled lists are dropped: LanguageTool rejects them, and an explicit client
+subset must not be widened.
 
 **Consequences:** modes can tighten checks or remove noise, but cannot override
-an explicit client restriction. The rule is visible in `merge_categories` and
-covered by tests.
+an explicit client restriction. The rules are visible in `merge_categories`
+and `merge_rules` and covered by tests.
 
 ## ADR-012 — Enable LanguageTool pipeline caching
 

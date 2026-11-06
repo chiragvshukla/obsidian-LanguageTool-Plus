@@ -8,5 +8,24 @@ disabled_categories:
   - COLLOQUIALISMS
   - REDUNDANCY
   - LT_PLUS
+# LanguageTool rules that ship disabled. Only correctness rules here; casual
+# writing gets no style nagging.
+enabled_rules:
+  - ANSTRENGEN_PHASE
+  - COPY_AND_PASTE
+  - DAS_DASS
+  - DRAG_AND_DROP
+  - DU_DIE
+  - EINE_ORIGINAL_RECHNUNG
+  - FALSCHES_RELATIVPRONOMEN
+  - KONJUNKTION_DASS_DAS
+  - KOMMA_INFINITIVGRUPPE_II
+  - MODALVERB_FLEKT_VERB
+  - MORGEN_MIT_VERGANGENHEIT
+  - PARTIE_VS_PARTEI
+  - SUPER_GAU
+  - WELCHE_SUBMAS_IST
+  - WERDEN_FOLGENDEN_SUB
+  - ZUSAMMENSCHREIBUNG_DAZU
 prompt: prompts/de/casual.md
 temperature: 0.4

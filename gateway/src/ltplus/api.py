@@ -143,8 +143,25 @@ def merge_level(client_level: str, mode: Mode) -> str:
     return "picky" if "picky" in (client_level, mode.level) else "default"
 
 
+def merge_rules(
+    client_enabled: list[str], client_disabled: list[str], mode: Mode
+) -> tuple[list[str], list[str]]:
+    """Rules a mode adds are enabled; any client disable still wins."""
+    enabled = sorted(set(client_enabled) | set(mode.enabled_rules))
+    disabled = sorted(set(client_disabled) | set(mode.disabled_rules))
+    enabled = [item for item in enabled if item not in set(disabled)]
+    return enabled, disabled
+
+
 def _apply_mode(params: dict[str, str], mode: Mode) -> None:
     params["level"] = merge_level(params.get("level", "default"), mode)
+
+    if params.get("enabledOnly", "").lower() == "true":
+        # LanguageTool rejects disabled lists here, and an explicit client
+        # subset must not be widened or narrowed by the mode (ADR-011).
+        params.pop("disabledCategories", None)
+        params.pop("disabledRules", None)
+        return
 
     enabled, disabled = merge_categories(
         _csv(params.get("enabledCategories")),
@@ -155,14 +172,24 @@ def _apply_mode(params: dict[str, str], mode: Mode) -> None:
         params["enabledCategories"] = ",".join(enabled)
     else:
         params.pop("enabledCategories", None)
-
-    if params.get("enabledOnly", "").lower() == "true":
-        # LanguageTool rejects a disabled list when enabledOnly is true.
-        params.pop("disabledCategories", None)
-    elif disabled:
+    if disabled:
         params["disabledCategories"] = ",".join(disabled)
     else:
         params.pop("disabledCategories", None)
+
+    enabled_rules, disabled_rules = merge_rules(
+        _csv(params.get("enabledRules")),
+        _csv(params.get("disabledRules")),
+        mode,
+    )
+    if enabled_rules:
+        params["enabledRules"] = ",".join(enabled_rules)
+    else:
+        params.pop("enabledRules", None)
+    if disabled_rules:
+        params["disabledRules"] = ",".join(disabled_rules)
+    else:
+        params.pop("disabledRules", None)
 
 
 def _upstream_error(exc: httpx.HTTPError) -> JSONResponse:

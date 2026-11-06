@@ -10,5 +10,32 @@ enabled_categories:
   - LT_PLUS
 disabled_categories:
   - COLLOQUIALISMS
+# LanguageTool rules that ship disabled. Correctness and recommended spelling
+# only; colloquialisms and letter formulas do not belong in academic prose.
+enabled_rules:
+  - ANSTRENGEN_PHASE
+  - COPY_AND_PASTE
+  - DAS_DASS
+  - DRAG_AND_DROP
+  - DU_DIE
+  - EINE_ORIGINAL_RECHNUNG
+  - EMPFOHLENE_GETRENNTSCHREIBUNG
+  - EMPFOHLENE_ZUSAMMENSCHREIBUNG
+  - EMPFOHLEN_LANGGEHEGT
+  - EMPFOHLEN_TIEFGREIFEND
+  - EMPFOHLEN_WEITREICHEND
+  - FALSCHES_RELATIVPRONOMEN
+  - F_ANSTATT_PH_2
+  - ISBN-NUMMER
+  - KONJUNKTION_DASS_DAS
+  - KOMMA_INFINITIVGRUPPE_II
+  - MODALVERB_FLEKT_VERB
+  - MORGEN_MIT_VERGANGENHEIT
+  - PARTIE_VS_PARTEI
+  - SUPER_GAU
+  - UND_SOWIE
+  - WELCHE_SUBMAS_IST
+  - WERDEN_FOLGENDEN_SUB
+  - ZUSAMMENSCHREIBUNG_DAZU
 prompt: prompts/de/academic.md
 temperature: 0.1
