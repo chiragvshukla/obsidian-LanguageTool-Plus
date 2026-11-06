@@ -3,6 +3,7 @@ from collections.abc import Iterator
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
+from urllib.parse import parse_qs
 
 import httpx
 import pytest
@@ -156,18 +157,117 @@ def test_rewrite_rejects_changed_numbers(client: TestClient, llm: FakeLLM) -> No
     assert "numbers, links, or code changed" in response.json()["error"]["message"]
 
 
+def checked_text(request: httpx.Request) -> str:
+    """The `text` field of one forwarded `/v2/check` request."""
+    return parse_qs(request.content.decode("utf-8"))["text"][0]
+
+
 @respx.mock
 def test_rewrite_rejects_new_language_errors(client: TestClient, llm: FakeLLM) -> None:
     llm.replies = [completion(("ist", "war"))]
     new_error = httpx.Response(200, json={"matches": [{"rule": {"id": "NEW_ERROR"}}]})
     clean = httpx.Response(200, json={"matches": []})
-    route = respx.post(CHECK_URL).mock(side_effect=[clean, new_error, clean, new_error])
+    route = respx.post(CHECK_URL).mock(
+        side_effect=lambda request: (
+            new_error if checked_text(request) == "Das war ein Test." else clean
+        )
+    )
 
     response = post(client)
 
     assert response.status_code == 502
     assert "NEW_ERROR" in response.json()["error"]["message"]
-    assert route.call_count == 4
+    # The guard uses the mode's LanguageTool settings, not bare defaults.
+    params = parse_qs(route.calls[0].request.content.decode("utf-8"))
+    assert params["level"] == ["default"]
+    assert "STYLE" in params["disabledCategories"][0]
+
+
+@respx.mock
+def test_rewrite_ignores_new_style_findings(client: TestClient, llm: FakeLLM) -> None:
+    llm.replies = [completion(("ist", "war"))]
+    style = {
+        "rule": {
+            "id": "GERMAN_WORD_REPEAT_BEGINNING_RULE",
+            "issueType": "style",
+        }
+    }
+    clean = httpx.Response(200, json={"matches": []})
+    respx.post(CHECK_URL).mock(
+        side_effect=lambda request: (
+            httpx.Response(200, json={"matches": [style]})
+            if checked_text(request) == "Das war ein Test."
+            else clean
+        )
+    )
+
+    response = post(client)
+
+    assert response.status_code == 200
+    assert response.json()["rewritten"] == "Das war ein Test."
+
+
+@respx.mock
+def test_rewrite_rejects_a_second_occurrence_of_a_known_rule(
+    client: TestClient, llm: FakeLLM
+) -> None:
+    llm.replies = [completion(("ist", "war"))]
+    one = {"rule": {"id": "KNOWN_RULE", "issueType": "grammar"}}
+    clean = httpx.Response(200, json={"matches": [one]})
+    twice = httpx.Response(200, json={"matches": [one, one]})
+    respx.post(CHECK_URL).mock(
+        side_effect=lambda request: (
+            twice if checked_text(request) == "Das war ein Test." else clean
+        )
+    )
+
+    response = post(client)
+
+    assert response.status_code == 502
+    assert "KNOWN_RULE" in response.json()["error"]["message"]
+
+
+@respx.mock
+def test_rewrite_drops_overlapping_changes(client: TestClient, llm: FakeLLM) -> None:
+    llm.replies = [
+        completion(
+            ("funktionerit", "funktioniert"),
+            ("dass alles gut funktionerit.", "dass alles gut funktioniert."),
+        )
+    ]
+    respx.post(CHECK_URL).mock(return_value=httpx.Response(200, json={"matches": []}))
+
+    response = post(client, text="Ich hoffe, dass alles gut funktionerit.")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["rewritten"] == "Ich hoffe, dass alles gut funktioniert."
+    assert len(body["changes"]) == 1
+    assert body["dropped"] == 1
+
+
+@respx.mock
+def test_rewrite_drops_only_the_change_that_adds_an_error(
+    client: TestClient, llm: FakeLLM
+) -> None:
+    llm.replies = [completion(("gut", "gutt"), ("schlecht", "schlimm"))]
+    bad = {"rule": {"id": "NEW_ERROR", "issueType": "misspelling"}}
+    respx.post(CHECK_URL).mock(
+        side_effect=lambda request: httpx.Response(
+            200,
+            json={
+                "matches": [bad] if "gutt" in checked_text(request) else []
+            },
+        )
+    )
+
+    response = post(client, text="Alpha ist gut. Beta ist schlecht.")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["rewritten"] == "Alpha ist gut. Beta ist schlimm."
+    assert [change["original"] for change in body["changes"]] == ["schlecht"]
+    assert body["dropped"] == 1
 
 
 @respx.mock

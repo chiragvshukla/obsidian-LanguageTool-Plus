@@ -91,8 +91,10 @@ selection check; those matches never pass through `/v2/check`.
 2. Gateway resolves the mode and loads `prompts/<language>/<mode.prompt>`.
 3. Gateway calls the OpenAI-compatible endpoint with `response_format`.
 4. Response is validated (JSON shape, ordered changes, length ratio,
-   numbers/links/code preserved, re-checked by LanguageTool).
-5. Gateway returns `{original, rewritten, changes}`.
+   numbers/links/code preserved, re-checked by LanguageTool with the mode's
+   parameters; style findings do not block).
+5. Gateway returns `{original, rewritten, changes}`, plus `dropped` when unsafe
+   changes were removed.
 
 A failed validation gets one stricter retry; nothing unvalidated is returned.
 Successful rewrites are cached in memory. Inline checks never call the LLM.

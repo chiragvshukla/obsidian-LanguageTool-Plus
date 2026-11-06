@@ -110,12 +110,18 @@ The model must answer:
 Every response is validated before it is returned:
 
 - JSON parses and matches the schema.
-- Changes are in text order, non-overlapping, and each `original` occurs in the
-  source.
+- Changes are applied in text order. Out-of-order changes are reordered; a
+  change that overlaps one already applied is dropped. A change whose
+  `original` is nowhere in the source still fails validation.
 - Length ratio is within 0.5–2.0.
 - Numbers, URLs, emails, inline code, and fenced code are unchanged.
-- Re-checking `rewritten` with LanguageTool adds no rule ID that the original
-  did not already trigger.
+- Re-checking `rewritten` with LanguageTool uses the mode's parameters
+  (`level`, categories, enabled/disabled rules) and compares correctness
+  findings per rule ID. A new rule, or one that now occurs more often, fails
+  validation. Findings with `issueType: style` never do.
+- If the whole set adds a correctness finding, each of up to 12 changes is
+  checked alone; the unsafe ones are dropped and the rest is returned with
+  `dropped: N` (ADR-021). If every change is unsafe, the request fails.
 
 A failed validation triggers one stricter retry. A second failure returns
 `502 llm_validation_failed`; unvalidated model text is never returned.

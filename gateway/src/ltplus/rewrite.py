@@ -25,15 +25,21 @@ from openai.types.chat import ChatCompletionMessageParam
 from openai.types.shared_params import ResponseFormatJSONObject, ResponseFormatJSONSchema
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
+from ltplus.api import _apply_mode
 from ltplus.config import Settings
 from ltplus.models import Mode
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-# Changes must stay in order and must not overlap.
+# Changes should stay in order and must not overlap. The model gets this right
+# most of the time; the applier tolerates the rest instead of failing a check.
 MIN_LENGTH_RATIO = 0.5
 MAX_LENGTH_RATIO = 2.0
+
+# Above this many changes, validating each one is not worth the LanguageTool
+# calls; the whole set is checked once instead.
+MAX_SAFE_CHECKS = 12
 
 # Spans the model must not alter. Keep this list short and mechanical; names
 # are left to the LanguageTool re-check rather than guessed by a tokenizer.
@@ -243,21 +249,42 @@ async def _generate(
     return response.choices[0].message.content or ""
 
 
-def _apply_changes(text: str, changes: list[LLMChange]) -> tuple[str, list[tuple[int, int]]]:
-    """Apply ordered, non-overlapping changes and report their source spans."""
-    parts: list[str] = []
-    spans: list[tuple[int, int]] = []
+def _apply_changes(
+    text: str, changes: list[LLMChange]
+) -> tuple[str, list[LLMChange], list[tuple[int, int]]]:
+    """Apply non-overlapping changes in text order and report their spans.
+
+    The model sometimes reports a change that contains another change, or lists
+    changes out of order. Those are skipped rather than failing the whole
+    rewrite. A change whose text is nowhere in the source still fails.
+    """
+    located: list[tuple[int, int, LLMChange]] = []
     cursor = 0
-    for change in changes:
+    for order, change in enumerate(changes):
         index = text.find(change.original, cursor)
         if index < 0:
+            index = text.find(change.original)
+        if index < 0:
             raise ValidationFailure("a reported change does not match the source text")
+        located.append((index, order, change))
+        if index >= cursor:
+            cursor = index + len(change.original)
+
+    located.sort(key=lambda item: (item[0], item[1]))
+    parts: list[str] = []
+    spans: list[tuple[int, int]] = []
+    kept: list[LLMChange] = []
+    cursor = 0
+    for index, _, change in located:
+        if index < cursor:
+            continue  # overlaps a change already applied
         parts.append(text[cursor:index])
         parts.append(change.replacement)
         spans.append((index, len(change.original)))
+        kept.append(change)
         cursor = index + len(change.original)
     parts.append(text[cursor:])
-    return "".join(parts), spans
+    return "".join(parts), kept, spans
 
 
 def _protected_spans(text: str) -> Counter[str]:
@@ -267,7 +294,7 @@ def _protected_spans(text: str) -> Counter[str]:
 def _validate_output(
     text: str, payload: LLMOutput
 ) -> tuple[str, list[LLMChange], list[tuple[int, int]]]:
-    rewritten, spans = _apply_changes(text, payload.changes)
+    rewritten, changes, spans = _apply_changes(text, payload.changes)
 
     ratio = len(rewritten) / len(text)
     if not MIN_LENGTH_RATIO <= ratio <= MAX_LENGTH_RATIO:
@@ -276,26 +303,81 @@ def _validate_output(
     if _protected_spans(text) != _protected_spans(rewritten):
         raise ValidationFailure("numbers, links, or code changed")
 
-    return rewritten, payload.changes, spans
+    return rewritten, changes, spans
 
 
-async def _match_ids(lt: httpx.AsyncClient, language: str, text: str) -> set[str]:
-    response = await lt.post(
-        "/v2/check", data={"text": text, "language": language, "level": "default"}
-    )
+async def _finding_counts(
+    lt: httpx.AsyncClient, language: str, mode: Mode, text: str
+) -> Counter[str]:
+    """Correctness findings per rule id, with the mode's LanguageTool settings.
+
+    Style findings are left out on purpose: a rewrite that reads differently
+    may trigger a style hint, but that is not an error the user needs to be
+    protected from.
+    """
+    params = {"text": text, "language": language, "level": mode.level}
+    _apply_mode(params, mode)
+    response = await lt.post("/v2/check", data=params)
     response.raise_for_status()
     payload = response.json()
     matches = payload.get("matches", []) if isinstance(payload, dict) else []
-    ids = {str(item.get("rule", {}).get("id")) for item in matches if isinstance(item, dict)}
-    return ids
+    counts: Counter[str] = Counter()
+    for item in matches:
+        if not isinstance(item, dict):
+            continue
+        rule = item.get("rule")
+        if not isinstance(rule, dict) or rule.get("issueType") == "style":
+            continue
+        counts[str(rule.get("id"))] += 1
+    return counts
 
 
-async def _new_rule_ids(
-    lt: httpx.AsyncClient, language: str, original: str, rewritten: str
-) -> set[str]:
-    before = await _match_ids(lt, language, original)
-    after = await _match_ids(lt, language, rewritten)
-    return after - before
+def _added_findings(before: Counter[str], after: Counter[str]) -> dict[str, int]:
+    return {
+        rule: count - before.get(rule, 0)
+        for rule, count in after.items()
+        if count > before.get(rule, 0)
+    }
+
+
+def _added_message(added: dict[str, int]) -> str:
+    detail = ", ".join(
+        f"{rule} (+{count})" if count > 1 else rule
+        for rule, count in sorted(added.items())
+    )
+    return (
+        f"the rewrite would add LanguageTool findings: {detail}. "
+        "Nothing was applied."
+    )
+
+
+async def _drop_unsafe_changes(
+    lt: httpx.AsyncClient,
+    language: str,
+    mode: Mode,
+    text: str,
+    before: Counter[str],
+    changes: list[LLMChange],
+) -> list[LLMChange] | None:
+    """Keep only changes that add no correctness finding on their own.
+
+    Returns None when there are too many changes to test one by one, or when
+    every change is safe alone (the failure then comes from their interaction).
+    """
+    if len(changes) > MAX_SAFE_CHECKS:
+        return None
+    kept: list[LLMChange] = []
+    for change in changes:
+        try:
+            rewritten, _, _ = _apply_changes(text, [change])
+        except ValidationFailure:
+            continue
+        after = await _finding_counts(lt, language, mode, rewritten)
+        if not _added_findings(before, after):
+            kept.append(change)
+    if len(kept) == len(changes):
+        return None
+    return kept
 
 
 @router.post("/rewrite")
@@ -362,7 +444,7 @@ async def rewrite(request: Request) -> Response:
         return JSONResponse(cached)
 
     client: AsyncOpenAI = request.app.state.llm
-    accepted: tuple[str, list[LLMChange], list[tuple[int, int]]] | None = None
+    accepted: tuple[str, list[LLMChange], list[tuple[int, int]], int] | None = None
     last_problem = ""
     for strict in (False, True):
         try:
@@ -400,23 +482,44 @@ async def rewrite(request: Request) -> Response:
             last_problem = str(exc)
             continue
 
+        lt = request.app.state.lt
         try:
-            new_rules = await _new_rule_ids(request.app.state.lt, language, payload.text, rewritten)
+            before = await _finding_counts(lt, language, mode, payload.text)
+            after = await _finding_counts(lt, language, mode, rewritten)
+            added = _added_findings(before, after)
+            if added:
+                # Drop the changes that introduce a finding on their own. The
+                # rest stays useful instead of failing the whole check.
+                safe = await _drop_unsafe_changes(
+                    lt, language, mode, payload.text, before, changes
+                )
+                if safe is None or not safe:
+                    last_problem = _added_message(added)
+                    continue
+                try:
+                    rewritten, changes, spans = _validate_output(
+                        payload.text, LLMOutput(changes=safe)
+                    )
+                except ValidationFailure as exc:
+                    last_problem = str(exc)
+                    continue
+                after = await _finding_counts(lt, language, mode, rewritten)
+                added = _added_findings(before, after)
+                if added:
+                    last_problem = _added_message(added)
+                    continue
         except httpx.HTTPError:
             return _error(503, "languagetool_unavailable", "LanguageTool is not reachable")
-        if new_rules:
-            last_problem = "the rewrite added LanguageTool errors: " + ", ".join(sorted(new_rules))
-            continue
-        accepted = (rewritten, changes, spans)
+        accepted = (rewritten, changes, spans, len(parsed.changes) - len(changes))
         break
 
     if accepted is None:
         logger.warning("rewrite rejected: %s", last_problem)
         return _error(502, "llm_validation_failed", last_problem)
 
-    rewritten, changes, spans = accepted
+    rewritten, changes, spans, dropped = accepted
 
-    result = {
+    result: dict[str, Any] = {
         "original": payload.text,
         "rewritten": rewritten,
         "changes": [
@@ -424,5 +527,7 @@ async def rewrite(request: Request) -> Response:
             for change, (offset, length) in zip(changes, spans, strict=True)
         ],
     }
+    if dropped:
+        result["dropped"] = dropped
     cache.put(key, result)
     return JSONResponse(result)

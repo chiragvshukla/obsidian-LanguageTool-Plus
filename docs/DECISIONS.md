@@ -325,7 +325,36 @@ git. Without a lemma tagger the alias index can be patchy for unusual forms;
 the cap of five aliases per form keeps homograph groups bounded. The indexes
 load lazily per pair, so a cold first hover can pause briefly.
 
-## ADR-020 — Chunk long text on paragraph boundaries; score with map + reduce
+## ADR-021 — A rewrite is blocked by new errors, not by new style hints
+
+**Status:** accepted
+
+**Context:** `/rewrite` re-checked every model rewrite with LanguageTool and
+rejected it when any new rule ID appeared. Model suggestions are often small
+grammar fixes, and a corrected sentence can legitimately trigger a style rule
+(e.g. three sentences now start with the same word). Inline paragraph and
+whole-document checks then failed with `502` and showed nothing, even though
+the rewrite was fine. Two other model habits also killed a check: a change that
+contains another change, and changes listed out of order.
+
+**Decision:** the re-check uses the same mode-derived LanguageTool parameters
+as `/v2/check` (`level`, categories, enabled/disabled rules) and compares
+occurrence counts per rule ID, not sets. Only correctness findings count;
+matches whose `issueType` is `style` never block a rewrite. The applier
+tolerates out-of-order changes and drops a change that overlaps one already
+applied; a change whose text is nowhere in the source is still a validation
+failure. If the whole set adds a correctness finding, each change is tested
+alone (up to 12) and the unsafe ones are dropped, so the remaining hints are
+still returned with `dropped: N`. When every change is unsafe, the request
+fails as before. This keeps the guarantee that the plugin never receives
+unvalidated text while making partial results usable.
+
+**Consequences:** a check can show fewer hints than the model proposed. A new
+style hint may appear as a normal LanguageTool underline after accepting an AI
+suggestion; that is visible, not silent. The guard costs up to `N + 2`
+LanguageTool calls only when the combined set fails validation.
+
+## ADR-020 - Chunk long text on paragraph boundaries; score with map + reduce
 
 **Status:** accepted
 

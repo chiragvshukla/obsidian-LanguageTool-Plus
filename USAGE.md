@@ -272,7 +272,7 @@ The gateway suite mocks LanguageTool and the LLM; it needs neither running.
 | Symptom | Likely cause |
 |---|---|
 | `/rewrite` returns `503 llm_unavailable` | Ollama or the configured endpoint is down, or `LLM_BASE_URL` is wrong. |
-| `/rewrite` returns `502 llm_validation_failed` | The model returned invalid JSON, changed protected text, or added new LanguageTool errors. Try again or use a stronger model. |
+| `/rewrite` returns `502 llm_validation_failed` | The model returned invalid JSON, changed protected text, or every one of its changes added a correctness finding. Try again or use a stronger model. A rewrite that only adds style hints is accepted. |
 | Plugin says it cannot fetch languages | Endpoint is not the gateway, or it includes `/v2`. Use `http://127.0.0.1:8077`. |
 | No underlines in code, math, or frontmatter | By design; those regions are skipped. |
 | LT checks work but AI does nothing | AI features are off, no LLM is reachable, or the text is too long for one automatic pass (2,000 characters). |
