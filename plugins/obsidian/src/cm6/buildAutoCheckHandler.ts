@@ -81,7 +81,7 @@ export function buildAutoCheckHandler(plugin: LanguageToolPlugin) {
           }, plugin.settings.autoCheckDelay);
         }
 
-        if (plugin.settings.enableAIFeatures && plugin.settings.aiAutoCheck) {
+        if (plugin.isAiReady() && plugin.settings.aiAutoCheck) {
           window.clearTimeout(aiTimer);
           aiTimer = window.setTimeout(() => {
             aiTimer = -1;

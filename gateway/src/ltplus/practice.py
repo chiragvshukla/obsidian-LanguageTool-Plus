@@ -22,6 +22,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from ltplus.api import _apply_mode
 from ltplus.config import Settings
 from ltplus.llm import chat_json, llm_status
+from ltplus.llm_config import LLMConfigError, resolve_llm
 from ltplus.models import Mode
 from ltplus.rewrite import PromptError
 
@@ -113,8 +114,7 @@ def _split_block(block: str, limit: int) -> list[str]:
                 pieces.append(current)
                 current = ""
             pieces.extend(
-                sentence[index : index + limit]
-                for index in range(0, len(sentence), limit)
+                sentence[index : index + limit] for index in range(0, len(sentence), limit)
             )
         elif not current:
             current = sentence
@@ -181,9 +181,7 @@ def _facts(text: str) -> dict[str, Any]:
     # Count a terminator only when a new sentence follows, and remove chains
     # like "z. B." / "i. d. R." first so they do not add sentences.
     without_abbreviations = re.sub(r"(?:\b[A-Za-z]\.\s*){2,}", " ", text)
-    sentences = (
-        len(re.findall(r"[.!?]+(?=\s+[A-ZÄÖÜ]|\s*$)", without_abbreviations)) or 1
-    )
+    sentences = len(re.findall(r"[.!?]+(?=\s+[A-ZÄÖÜ]|\s*$)", without_abbreviations)) or 1
     return {
         "words": words,
         "sentences": sentences,
@@ -231,9 +229,7 @@ def _score_message(
     )
 
 
-def _section_message(
-    text: str, language: str, mode: Mode, index: int, total: int
-) -> str:
+def _section_message(text: str, language: str, mode: Mode, index: int, total: int) -> str:
     return (
         f"Text section:\n<<<\n{text}\n>>>\n\n"
         f"Language: {language}\n"
@@ -263,9 +259,7 @@ def _reduce_message(
         "Section results:",
     ]
     for index, section in enumerate(sections, start=1):
-        grades = ", ".join(
-            f"{key}={value}" for key, value in section.grades.model_dump().items()
-        )
+        grades = ", ".join(f"{key}={value}" for key, value in section.grades.model_dump().items())
         notes = " | ".join(section.recommendations) or "none"
         lines.append(f"{index}. grades: {grades}; notes: {notes}")
     lines.append(
@@ -298,6 +292,7 @@ def _parse_score(content: str, label: str) -> ScoreOutput | JSONResponse:
 async def _llm_error(
     client: AsyncOpenAI,
     settings: Settings,
+    model_id: str,
     prompt: str,
     user_message: str,
     name: str,
@@ -311,7 +306,9 @@ async def _llm_error(
         {"role": "user", "content": user_message},
     ]
     try:
-        return await chat_json(client, settings, messages, name, model, temperature=0.2)
+        return await chat_json(
+            client, settings, messages, name, model, temperature=0.2, model_id=model_id
+        )
     except (BadRequestError, APIConnectionError, APIStatusError) as exc:
         status, code, message = llm_status(exc)
         return _error(status, code, message)
@@ -347,8 +344,7 @@ async def score(request: Request) -> Response:
         return _error(
             413,
             "text_too_long",
-            f"Text needs {len(chunks)} sections; the limit is "
-            f"{settings.llm_score_max_chunks}",
+            f"Text needs {len(chunks)} sections; the limit is {settings.llm_score_max_chunks}",
         )
 
     prose = _strip_markdown(payload.text)
@@ -362,10 +358,16 @@ async def score(request: Request) -> Response:
 
     facts = _facts(prose)
 
+    try:
+        client, target = await resolve_llm(request, settings)
+    except LLMConfigError as exc:
+        return _error(400, "llm_not_configured", str(exc))
+
     if len(chunks) == 1:
         content = await _llm_error(
-            request.app.state.llm,
+            client,
             settings,
+            target.model,
             prompt,
             _score_message(payload.text, payload.language, mode, facts, issues),
             "score",
@@ -380,8 +382,9 @@ async def score(request: Request) -> Response:
         sections: list[ScoreOutput] = []
         for index, chunk in enumerate(chunks, start=1):
             content = await _llm_error(
-                request.app.state.llm,
+                client,
                 settings,
+                target.model,
                 prompt,
                 _section_message(chunk, payload.language, mode, index, len(chunks)),
                 "score",
@@ -395,8 +398,9 @@ async def score(request: Request) -> Response:
             sections.append(section)
 
         content = await _llm_error(
-            request.app.state.llm,
+            client,
             settings,
+            target.model,
             reduce_prompt,
             _reduce_message(payload.language, mode, facts, issues, sections),
             "score-reduce",
@@ -443,9 +447,15 @@ async def topic(request: Request) -> Response:
     if prompt is None:
         return _error(400, "unsupported_language", f"No topic prompt for {payload.language}")
 
+    try:
+        client, target = await resolve_llm(request, settings)
+    except LLMConfigError as exc:
+        return _error(400, "llm_not_configured", str(exc))
+
     content = await _llm_error(
-        request.app.state.llm,
+        client,
         settings,
+        target.model,
         prompt,
         _topic_message(payload.language, mode),
         "topic",

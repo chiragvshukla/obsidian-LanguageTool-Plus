@@ -54,8 +54,12 @@ Unknown values are ignored (the setting applies), so the gateway never returns
 
 ## AI checking and rewriting
 
-Both AI actions require "Enable AI features" and call `POST /rewrite`. Results
-are validated by the gateway before the plugin sees them.
+Both AI actions require "Enable AI features" and call `POST /rewrite`. They also
+require an **AI base URL** and an **AI model** in the plugin settings; with
+either empty, AI stays off and only LanguageTool runs. The model list comes from
+`POST /llm/models`, and the API key is read from Obsidian's SecretStorage and
+sent to the gateway as headers. Results are validated by the gateway before the
+plugin sees them.
 
 - **Rewrite selection with AI** uses the note's mode. The review modal shows
   the original, the rewritten text with changed spans highlighted, and one
@@ -98,7 +102,7 @@ are validated by the gateway before the plugin sees them.
 - The status-bar **Aa** icon and the ribbon icon open the same menu: check the
   document, switch writing mode, switch the dictionary pair, run the AI
   actions, toggle automatic checking, and clear suggestions. AI entries are
-  hidden while AI features are off; selection actions stay disabled without a
+  hidden while AI features are off or no model is configured; selection actions stay disabled without a
   selection.
 - The three AI category toggles (grammar, style, vocabulary) are sent as
   `categories` on every `/rewrite` call. All on is the default and sends no

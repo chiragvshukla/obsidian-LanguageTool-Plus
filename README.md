@@ -20,8 +20,7 @@ against the gateway in pass-through mode.
 > **Status:** Phase 9 complete. The gateway proxies `/v2/check` and
 > `/v2/languages`, applies writing modes, and serves `/rewrite`, `/score`,
 > `/topic`, and `/dictionary/*`. The plugin supports selection rewrites,
-> whole-document AI checks, long-note scoring, and the hover dictionary. See
-> `docs/PLAN.md` for the phase history.
+> whole-document AI checks, long-note scoring, and the hover dictionary.
 
 > **Built with AI (open-weight models).** This is a personal project, developed
 > largely with AI coding assistants running open-weight models. Changes are
@@ -29,10 +28,18 @@ against the gateway in pass-through mode.
 > you depend on.
 >
 > **AI features.** Rewrites, AI checks, and the optional paragraph auto-check
-> send text to the OpenAI-compatible endpoint you configure, which defaults to a
-> local Ollama instance. The plugin's "Enable AI features" switch is off by
-> default, and nothing is sent while it is off. If you point the gateway at a
-> hosted API, that provider's terms and privacy policy apply.
+> send text to the OpenAI-compatible endpoint you configure in the plugin
+> settings, together with the model and (optionally) an API key stored in
+> Obsidian's SecretStorage. The plugin's "Enable AI features" switch is off by
+> default, and no AI request is made while it is off or while no endpoint and
+> model are configured. LanguageTool checks are unaffected. If you point the
+> plugin at a hosted API, that provider's terms and privacy policy apply.
+
+> [!WARNING]
+> **AI features are slow and hardware-dependent.** A local model can take
+> seconds to tens of seconds per rewrite or AI check, versus milliseconds for a
+> LanguageTool check. Speed depends on your CPU, GPU, and available memory; the
+> first request is slower while the model loads. Start with a small model.
 
 ## Requirements
 

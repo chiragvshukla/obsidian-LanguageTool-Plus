@@ -14,13 +14,15 @@ interface PracticeErrorBody {
 async function post<T>(
   settings: LanguageToolPluginSettings,
   path: string,
-  body: Record<string, unknown>
+  body: Record<string, unknown>,
+  headers: Record<string, string> = {}
 ): Promise<T> {
   const res = await requestUrl({
     url: `${settings.serverUrl}${path}`,
     method: "POST",
     contentType: "application/json",
     body: JSON.stringify(body),
+    headers,
     throw: false
   });
 
@@ -43,17 +45,19 @@ export function requestScore(
   settings: LanguageToolPluginSettings,
   text: string,
   language: string | undefined,
-  mode: string
+  mode: string,
+  headers: Record<string, string> = {}
 ): Promise<ScoreResult> {
-  return post<ScoreResult>(settings, "/score", { text, language, mode });
+  return post<ScoreResult>(settings, "/score", { text, language, mode }, headers);
 }
 
 export function requestTopic(
   settings: LanguageToolPluginSettings,
   language: string | undefined,
-  mode: string
+  mode: string,
+  headers: Record<string, string> = {}
 ): Promise<TopicResult> {
-  return post<TopicResult>(settings, "/topic", { language, mode });
+  return post<TopicResult>(settings, "/topic", { language, mode }, headers);
 }
 
 const GRADE_LABELS: { key: keyof ScoreResult["grades"]; label: string }[] = [

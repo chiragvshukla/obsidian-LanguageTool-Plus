@@ -27,6 +27,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from ltplus.api import _apply_mode
 from ltplus.config import Settings
 from ltplus.llm import chat_json, llm_status
+from ltplus.llm_config import LLMConfigError, resolve_llm
 from ltplus.models import Mode
 
 logger = logging.getLogger(__name__)
@@ -95,8 +96,9 @@ CATEGORY_LABELS = {
     "vocabulary": "a word written in another language",
 }
 
-# (language, mode, instruction, text, categories, context before, context after)
-CacheKey = tuple[str, str, str, str, str, str, str]
+# (language, mode, instruction, text, categories, context before, context after,
+#  model identity)
+CacheKey = tuple[str, str, str, str, str, str, str, str]
 
 
 class RewriteCache:
@@ -185,9 +187,7 @@ def _categories_key(categories: list[str] | None) -> str:
     return ",".join(sorted(set(categories) & set(KNOWN_CATEGORIES)))
 
 
-def _filter_changes(
-    changes: list[LLMChange], categories: list[str] | None
-) -> list[LLMChange]:
+def _filter_changes(changes: list[LLMChange], categories: list[str] | None) -> list[LLMChange]:
     """Drop changes the client has switched off."""
     if categories is None:
         return changes
@@ -198,6 +198,7 @@ def _filter_changes(
 async def _generate(
     client: AsyncOpenAI,
     settings: Settings,
+    model_id: str,
     prompt: str,
     text: str,
     instruction: str,
@@ -215,13 +216,11 @@ async def _generate(
         {"role": "system", "content": system},
         {
             "role": "user",
-            "content": _user_message(
-                text, instruction, categories, context_before, context_after
-            ),
+            "content": _user_message(text, instruction, categories, context_before, context_after),
         },
     ]
 
-    return await chat_json(client, settings, messages, "rewrite", LLMOutput, temperature)
+    return await chat_json(client, settings, messages, "rewrite", LLMOutput, temperature, model_id)
 
 
 def _apply_changes(
@@ -317,13 +316,9 @@ def _added_findings(before: Counter[str], after: Counter[str]) -> dict[str, int]
 
 def _added_message(added: dict[str, int]) -> str:
     detail = ", ".join(
-        f"{rule} (+{count})" if count > 1 else rule
-        for rule, count in sorted(added.items())
+        f"{rule} (+{count})" if count > 1 else rule for rule, count in sorted(added.items())
     )
-    return (
-        f"the rewrite would add LanguageTool findings: {detail}. "
-        "Nothing was applied."
-    )
+    return f"the rewrite would add LanguageTool findings: {detail}. Nothing was applied."
 
 
 async def _drop_unsafe_changes(
@@ -400,9 +395,12 @@ async def rewrite(request: Request) -> Response:
 
     # Nothing to ask when the client switched every category off.
     if payload.categories is not None and not payload.categories:
-        return JSONResponse(
-            {"original": payload.text, "rewritten": payload.text, "changes": []}
-        )
+        return JSONResponse({"original": payload.text, "rewritten": payload.text, "changes": []})
+
+    try:
+        client, target = await resolve_llm(request, settings)
+    except LLMConfigError as exc:
+        return _error(400, "llm_not_configured", str(exc))
 
     key = (
         language,
@@ -412,13 +410,13 @@ async def rewrite(request: Request) -> Response:
         _categories_key(payload.categories),
         payload.context_before,
         payload.context_after,
+        f"{target.base_url}|{target.model}",
     )
     cache: RewriteCache = request.app.state.rewrite_cache
     cached = cache.get(key)
     if cached is not None:
         return JSONResponse(cached)
 
-    client: AsyncOpenAI = request.app.state.llm
     accepted: tuple[str, list[LLMChange], list[tuple[int, int]], int] | None = None
     last_problem = ""
     for strict in (False, True):
@@ -426,6 +424,7 @@ async def rewrite(request: Request) -> Response:
             content = await _generate(
                 client,
                 settings,
+                target.model,
                 prompt,
                 payload.text,
                 payload.instruction,
@@ -441,9 +440,7 @@ async def rewrite(request: Request) -> Response:
 
         try:
             parsed = LLMOutput.model_validate(json.loads(content))
-            parsed = LLMOutput(
-                changes=_filter_changes(parsed.changes, payload.categories)
-            )
+            parsed = LLMOutput(changes=_filter_changes(parsed.changes, payload.categories))
             rewritten, changes, spans = _validate_output(payload.text, parsed)
         except (json.JSONDecodeError, ValidationError):
             last_problem = "the response was not valid JSON"
@@ -460,9 +457,7 @@ async def rewrite(request: Request) -> Response:
             if added:
                 # Drop the changes that introduce a finding on their own. The
                 # rest stays useful instead of failing the whole check.
-                safe = await _drop_unsafe_changes(
-                    lt, language, mode, payload.text, before, changes
-                )
+                safe = await _drop_unsafe_changes(lt, language, mode, payload.text, before, changes)
                 if safe is None or not safe:
                     last_problem = _added_message(added)
                     continue

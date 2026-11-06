@@ -32,6 +32,7 @@ import {
   getDocumentLanguage
 } from "./helpers";
 import { getDetectionResult, LanguageToolApiCredentials } from "./api";
+import { isLlmConfigured, llmHeaders } from "./llmConfig";
 import { buildUnderlineExtension } from "./cm6/underlineExtension";
 import { buildDictionaryHover } from "./cm6/dictionaryHover";
 import {
@@ -366,7 +367,7 @@ export default class LanguageToolPlugin extends Plugin {
       id: "ltai-rewrite-selection",
       name: "Rewrite selection with AI",
       editorCheckCallback: (checking, editor) => {
-        if (!this.settings.enableAIFeatures) {
+        if (!this.isAiReady()) {
           return false;
         }
         if (checking) {
@@ -384,7 +385,7 @@ export default class LanguageToolPlugin extends Plugin {
       id: "ltai-check-selection",
       name: "Check selection with AI",
       editorCheckCallback: (checking, editor) => {
-        if (!this.settings.enableAIFeatures) {
+        if (!this.isAiReady()) {
           return false;
         }
         if (checking) {
@@ -402,7 +403,7 @@ export default class LanguageToolPlugin extends Plugin {
       id: "ltai-check-paragraph",
       name: "Check current paragraph with AI",
       editorCheckCallback: (checking, editor) => {
-        if (!this.settings.enableAIFeatures) {
+        if (!this.isAiReady()) {
           return false;
         }
         if (checking) {
@@ -422,7 +423,7 @@ export default class LanguageToolPlugin extends Plugin {
       id: "ltai-check-document",
       name: "Check whole document with AI",
       editorCheckCallback: (checking, editor) => {
-        if (!this.settings.enableAIFeatures) {
+        if (!this.isAiReady()) {
           return false;
         }
         if (checking) {
@@ -437,7 +438,7 @@ export default class LanguageToolPlugin extends Plugin {
       id: "ltai-score-document",
       name: "Score current note with AI",
       editorCheckCallback: (checking, editor) => {
-        if (!this.settings.enableAIFeatures) {
+        if (!this.isAiReady()) {
           return false;
         }
         if (checking) {
@@ -452,7 +453,7 @@ export default class LanguageToolPlugin extends Plugin {
       id: "ltai-writing-topic",
       name: "Insert writing topic with AI",
       editorCheckCallback: (checking, editor) => {
-        if (!this.settings.enableAIFeatures) {
+        if (!this.isAiReady()) {
           return false;
         }
         if (checking) {
@@ -514,7 +515,9 @@ export default class LanguageToolPlugin extends Plugin {
       text,
       language,
       mode,
-      this.getAiCategories()
+      this.getAiCategories(),
+      undefined,
+      this.llmHeaders()
     );
 
     if (rewritten === text) {
@@ -550,7 +553,13 @@ export default class LanguageToolPlugin extends Plugin {
         this.settings.writingMode ??
         "neutral";
       const language = await this.getRewriteLanguage(text.slice(0, 500));
-      const result = await requestScore(this.settings, text, language, mode);
+      const result = await requestScore(
+        this.settings,
+        text,
+        language,
+        mode,
+        this.llmHeaders()
+      );
       new ScoreModal(this.app, result, WRITING_MODES[mode], () => {
         this.scoringOpen = false;
       }).open();
@@ -567,7 +576,12 @@ export default class LanguageToolPlugin extends Plugin {
     const language = await this.getRewriteLanguage(
       editor.getValue().slice(0, 500)
     );
-    const result = await requestTopic(this.settings, language, mode);
+    const result = await requestTopic(
+      this.settings,
+      language,
+      mode,
+      this.llmHeaders()
+    );
 
     const cursor = editor.getCursor();
     const prefix = cursor.ch === 0 ? "" : "\n\n";
@@ -592,7 +606,9 @@ export default class LanguageToolPlugin extends Plugin {
       text,
       language,
       mode,
-      this.getAiCategories()
+      this.getAiCategories(),
+      undefined,
+      this.llmHeaders()
     );
 
     const view = editorToCodeMirror(editor);
@@ -617,7 +633,7 @@ export default class LanguageToolPlugin extends Plugin {
    * every call succeeded and the note is unchanged.
    */
   private async checkDocumentWithAI(editor: Editor): Promise<void> {
-    if (!this.settings.enableAIFeatures || this.scoringOpen) {
+    if (!this.isAiReady() || this.scoringOpen) {
       return;
     }
     const snapshot = editor.getValue();
@@ -677,7 +693,8 @@ export default class LanguageToolPlugin extends Plugin {
               chunk.to,
               Math.min(snapshot.length, chunk.to + 500)
             )
-          }
+          },
+          this.llmHeaders()
         );
         results.push({ from: chunk.from, text: chunk.text, changes: result.changes });
       }
@@ -733,7 +750,7 @@ export default class LanguageToolPlugin extends Plugin {
     view: EditorView,
     manual = false
   ): Promise<void> {
-    if (!this.settings.enableAIFeatures) {
+    if (!this.isAiReady()) {
       return;
     }
     if (
@@ -804,7 +821,8 @@ export default class LanguageToolPlugin extends Plugin {
         language,
         mode,
         this.getAiCategories(),
-        context
+        context,
+        this.llmHeaders()
       ));
     } catch (e) {
       console.error(e);
@@ -817,7 +835,7 @@ export default class LanguageToolPlugin extends Plugin {
     if (
       generation !== this.aiCheckGeneration ||
       view.state.doc !== doc ||
-      !this.settings.enableAIFeatures ||
+      !this.isAiReady() ||
       (!manual && !this.settings.aiAutoCheck)
     ) {
       if (manual) {
@@ -1068,7 +1086,7 @@ export default class LanguageToolPlugin extends Plugin {
       })
       .addSeparator();
 
-    if (this.settings.enableAIFeatures) {
+    if (this.isAiReady()) {
       menu.addItem(item => {
         item.setTitle("Rewrite selection with AI");
         item.setIcon("sparkles");
@@ -1374,6 +1392,18 @@ export default class LanguageToolPlugin extends Plugin {
     // any settings change invalidates them
     this.hashLru.clear();
     await this.saveData(this.settings);
+  }
+
+  /**
+   * AI runs only when the master switch is on and the plugin has its own
+   * endpoint and model. An empty configuration means LanguageTool only.
+   */
+  public isAiReady(): boolean {
+    return Boolean(this.settings.enableAIFeatures) && isLlmConfigured(this.settings);
+  }
+
+  private llmHeaders(): Record<string, string> {
+    return llmHeaders(this.app, this.settings);
   }
 
   /**

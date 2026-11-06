@@ -81,19 +81,34 @@ Port `8010` talks to LanguageTool directly and does not apply writing modes,
 the personal dictionary, style rules, or consistency checks. Use `8077` for
 everything.
 
-## 4. Optional: start an LLM
+## 4. Optional: AI features
 
-AI rewrites and AI checks need an OpenAI-compatible `/v1/chat/completions`
-endpoint. Ollama is the local default:
+AI rewrites, checks, scoring, and topics need an OpenAI-compatible endpoint. You
+configure it in Obsidian, not in `.env`:
+
+1. Settings → LanguageTool Plus → AI features.
+2. **AI base URL**: the endpoint, including `/v1`
+   (Ollama: `http://127.0.0.1:11434/v1`).
+3. **AI API key**: optional; stored in Obsidian's SecretStorage on this device.
+4. **AI model**: press **Refresh** to list the models, then pick one.
+
+The plugin sends the endpoint, model, and key to the gateway with every AI
+request. If the base URL or model is empty, AI stays off and only LanguageTool
+runs. The gateway's `LLM_*` values remain the fallback for direct HTTP clients.
+
+> [!WARNING]
+> AI rewrites and checks are slow and depend on your hardware. Expect seconds
+> to tens of seconds, not the milliseconds a LanguageTool check takes. Plan for
+> more time on CPU-only machines and on the first request while the model loads.
+
+For local Ollama:
 
 ```powershell
 ollama serve
 ollama pull gemma4:e4b-it-q4_K_M
 ```
 
-The model name above is only `.env`'s default. Pull whatever you set in
-`LLM_MODEL`, or point `LLM_BASE_URL` at a hosted provider and set
-`LLM_API_KEY`. Verify:
+Verify the endpoint lists its models:
 
 ```powershell
 Invoke-RestMethod http://127.0.0.1:11434/v1/models

@@ -81,6 +81,12 @@ export interface LanguageToolPluginSettings {
 
   // AI features are opt-in. Every AI command checks this flag first.
   enableAIFeatures?: boolean;
+  // OpenAI-compatible endpoint chosen in the plugin. Empty means AI is off,
+  // even when the gateway has an `.env` default.
+  llmBaseUrl?: string;
+  llmModel?: string;
+  // SecretStorage secret holding the LLM API key (value never stored here).
+  llmApiKeySecretName?: string;
   aiAutoCheck?: boolean;
   /** Which AI suggestion categories are allowed. Missing means on. */
   aiGrammar?: boolean;
@@ -123,6 +129,8 @@ export const DEFAULT_SETTINGS: LanguageToolPluginSettings = {
   pickyMode: false,
 
   enableAIFeatures: false,
+  llmBaseUrl: "",
+  llmModel: "",
   aiAutoCheck: false,
   aiGrammar: true,
   aiStyle: true,
@@ -168,21 +176,6 @@ interface SettingsSection {
   items: RenderedSettingDefinition[];
 }
 
-function appendPremiumInfoLink(setting: Setting): void {
-  setting.descEl.createEl("br");
-  setting.descEl.createEl(
-    "a",
-    {
-      text: "Click here for information about Premium Access",
-      href:
-        "https://github.com/Clemens-E/obsidian-languagetool-plugin#account-setup"
-    },
-    a => {
-      a.setAttr("target", "_blank");
-    }
-  );
-}
-
 function appendRuleListLink(setting: Setting): void {
   setting.descEl.createEl("br");
   setting.descEl.createEl(
@@ -201,6 +194,8 @@ export class LanguageToolSettingsTab extends PluginSettingTab {
   private readonly plugin: LanguageToolPlugin;
   private languagesPromise?: Promise<LanguageToolLanguage[]>;
   private dictionaryPoll: number | null = null;
+  private aiModels: string[] = [];
+  private aiModelsFetchedFor?: string;
   public constructor(app: App, plugin: LanguageToolPlugin) {
     super(app, plugin);
     this.plugin = plugin;
@@ -341,6 +336,41 @@ export class LanguageToolSettingsTab extends PluginSettingTab {
     }, 2000);
   }
 
+  private async refreshAiModels(): Promise<void> {
+    const baseUrl = this.plugin.settings.llmBaseUrl?.trim();
+    if (!baseUrl) {
+      this.aiModels = [];
+      return;
+    }
+    const secretName = this.plugin.settings.llmApiKeySecretName;
+    let apiKey = "";
+    if (requireApiVersion("1.11.4") && secretName) {
+      apiKey = this.app.secretStorage.getSecret(secretName) ?? "";
+    }
+    try {
+      const res = await requestUrl({
+        url: `${this.plugin.settings.serverUrl}/llm/models`,
+        method: "POST",
+        contentType: "application/json",
+        body: JSON.stringify({ base_url: baseUrl, api_key: apiKey }),
+        throw: false
+      });
+      if (res.status < 200 || res.status >= 300) {
+        throw new Error(`gateway returned ${res.status}`);
+      }
+      const models = (res.json as { models?: unknown }).models;
+      this.aiModels = Array.isArray(models)
+        ? models.filter((model): model is string => typeof model === "string")
+        : [];
+    } catch (e) {
+      this.aiModels = [];
+      new Notice(
+        `Could not load models: ${e instanceof Error ? e.message : String(e)}`,
+        6000
+      );
+    }
+  }
+
   private getSections(): SettingsSection[] {
     // Shared by the render callbacks of one render cycle: some settings
     // reconfigure others (endpoint changes clamp the delay slider and reset
@@ -439,7 +469,6 @@ export class LanguageToolSettingsTab extends PluginSettingTab {
                   await this.plugin.saveSettings();
                 })
             );
-            appendPremiumInfoLink(setting);
           }
         },
         {
@@ -491,7 +520,6 @@ export class LanguageToolSettingsTab extends PluginSettingTab {
                 });
               });
             }
-            appendPremiumInfoLink(setting);
           }
         },
         {
@@ -854,6 +882,96 @@ export class LanguageToolSettingsTab extends PluginSettingTab {
                   this.plugin.settings.enableAIFeatures = value;
                   await this.plugin.saveSettings();
                   // The category and auto-check toggles follow the master.
+                  this.rerender();
+                });
+            });
+          }
+        },
+        {
+          name: "AI base URL",
+          desc:
+            "OpenAI-compatible endpoint, usually ending in /v1. Leave it empty to keep AI off and use LanguageTool only.",
+          render: setting => {
+            setting.addText(text => {
+              text
+                .setPlaceholder("http://127.0.0.1:11434/v1")
+                .setValue(this.plugin.settings.llmBaseUrl ?? "")
+                .onChange(async value => {
+                  this.plugin.settings.llmBaseUrl = value.trim();
+                  this.plugin.settings.llmModel = "";
+                  await this.plugin.saveSettings();
+                });
+              text.inputEl.addEventListener("blur", () => {
+                this.aiModels = [];
+                this.aiModelsFetchedFor = undefined;
+                this.rerender();
+              });
+            });
+          }
+        },
+        {
+          name: "AI API key",
+          desc:
+            "Stored in Obsidian's SecretStorage on this device. Leave it empty when the endpoint needs no key.",
+          render: setting => {
+            if (
+              requireApiVersion("1.11.4") &&
+              this.plugin.isSecretStorageAvailable()
+            ) {
+              setting.addComponent(el =>
+                new SecretComponent(this.app, el)
+                  .setValue(this.plugin.settings.llmApiKeySecretName ?? "")
+                  .onChange(async value => {
+                    this.plugin.settings.llmApiKeySecretName = value;
+                    this.aiModels = [];
+                    this.aiModelsFetchedFor = undefined;
+                    await this.plugin.saveSettings();
+                  })
+              );
+            } else {
+              setting.setDesc(
+                "Requires Obsidian 1.11.4 or newer for SecretStorage."
+              );
+            }
+          }
+        },
+        {
+          name: "AI model",
+          desc:
+            "Loaded from the endpoint. Refresh after changing the URL or key. AI stays off until a model is selected.",
+          render: setting => {
+            const configured = Boolean(
+              this.plugin.settings.llmBaseUrl?.trim()
+            );
+            if (
+              configured &&
+              this.aiModelsFetchedFor !== this.plugin.settings.llmBaseUrl
+            ) {
+              this.aiModelsFetchedFor = this.plugin.settings.llmBaseUrl;
+              void this.refreshAiModels().then(() => this.rerender());
+            }
+            setting.addDropdown(dropdown => {
+              const current = this.plugin.settings.llmModel ?? "";
+              for (const model of this.aiModels) {
+                dropdown.addOption(model, model);
+              }
+              if (current && !this.aiModels.includes(current)) {
+                dropdown.addOption(current, current);
+              }
+              dropdown
+                .setValue(current)
+                .setDisabled(!configured)
+                .onChange(async value => {
+                  this.plugin.settings.llmModel = value;
+                  await this.plugin.saveSettings();
+                });
+            });
+            setting.addButton(button => {
+              button
+                .setButtonText("Refresh")
+                .setDisabled(!configured)
+                .onClick(async () => {
+                  await this.refreshAiModels();
                   this.rerender();
                 });
             });

@@ -29,6 +29,31 @@ official `openai` SDK, so no provider-specific fields are sent.
 
 No model name is hard-coded in source. Model choice belongs to configuration.
 
+## Per-request overrides
+
+A client may override the endpoint, key, and model for one request:
+
+| Header | Overrides |
+|---|---|
+| `X-LLM-Base-URL` | `LLM_BASE_URL` |
+| `X-LLM-API-Key` | `LLM_API_KEY` |
+| `X-LLM-Model` | `LLM_MODEL` |
+
+The Obsidian plugin uses these headers so its settings win over `.env`. Missing
+headers keep the gateway defaults, so the HTTP API stays usable on its own.
+Clients are cached by base URL and a hash of the key; the rewrite cache key also
+includes the model, so switching models never returns another model's result.
+
+`POST /llm/models` lists the endpoint's models for the plugin picker:
+
+```json
+{ "base_url": "https://example.test/v1", "api_key": "secret" }
+```
+
+Response: `{"models": ["model-a", "model-b"]}`. The key is optional. The gateway
+requests `{base_url}/models` and returns `502`/`503`/`504` on upstream failures.
+Only `http://` and `https://` URLs are accepted.
+
 ## `POST /rewrite`
 
 Request (JSON):

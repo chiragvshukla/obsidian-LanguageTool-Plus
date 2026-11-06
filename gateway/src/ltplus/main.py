@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from collections import OrderedDict
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -14,6 +15,8 @@ from ltplus import __version__
 from ltplus.api import router
 from ltplus.config import Settings, get_settings
 from ltplus.lexicon import load_lexicon, validate_modes
+from ltplus.llm_config import close_clients
+from ltplus.llm_config import router as llm_config_router
 from ltplus.modes import ModeConfigError, load_modes
 from ltplus.practice import load_practice_prompts
 from ltplus.practice import router as practice_router
@@ -58,6 +61,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 yield
             finally:
                 await app.state.llm.close()
+                await close_clients(app.state.llm_clients)
 
     app = FastAPI(
         title="LanguageToolPlus",
@@ -72,10 +76,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.prompts = prompts
     app.state.practice_prompts = practice_prompts
     app.state.rewrite_cache = RewriteCache(settings.llm_cache_size)
+    app.state.llm_clients = OrderedDict()
     app.state.wordbook = Wordbook(settings.wordbook_dir)
     app.include_router(router)
     app.include_router(rewrite_router)
     app.include_router(practice_router)
+    app.include_router(llm_config_router)
     app.include_router(wordbook_router)
 
     @app.get("/healthz")

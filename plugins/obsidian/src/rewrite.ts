@@ -38,7 +38,8 @@ export async function requestRewrite(
   language?: string,
   mode?: string,
   categories?: string[],
-  context?: { before?: string; after?: string }
+  context?: { before?: string; after?: string },
+  headers: Record<string, string> = {}
 ): Promise<RewriteResult> {
   const body: Record<string, string | string[]> = {
     text,
@@ -62,6 +63,7 @@ export async function requestRewrite(
     method: "POST",
     contentType: "application/json",
     body: JSON.stringify(body),
+    headers,
     throw: false
   });
 

@@ -32,11 +32,12 @@ async def chat_json(
     name: str,
     model: type[BaseModel],
     temperature: float,
+    model_id: str,
 ) -> str:
     """Call the endpoint once, falling back to `json_object` when needed."""
     try:
         response = await client.chat.completions.create(
-            model=settings.llm_model,
+            model=model_id,
             messages=messages,
             temperature=temperature,
             max_tokens=settings.llm_max_tokens,
@@ -46,7 +47,7 @@ async def chat_json(
         # Some compatible servers know only json_object (ADR-010).
         fallback: ResponseFormatJSONObject = {"type": "json_object"}
         response = await client.chat.completions.create(
-            model=settings.llm_model,
+            model=model_id,
             messages=messages,
             temperature=temperature,
             max_tokens=settings.llm_max_tokens,

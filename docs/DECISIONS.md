@@ -431,6 +431,25 @@ credit files; only the installed folder and in-app name change.
 move with the old folder, so the old plugin folder can be removed after the new
 one starts.
 
+## ADR-023 - The plugin owns the LLM endpoint and model
+
+**Context:** the gateway read a single LLM endpoint, key, and model from `.env`.
+A user with several hosted models could only switch by editing `.env` and
+restarting, and the plugin could not show which models the endpoint offers.
+
+**Decision:** the plugin stores the OpenAI-compatible base URL, the model, and a
+SecretStorage reference to the API key. It sends them as `X-LLM-Base-URL`,
+`X-LLM-Model`, and `X-LLM-API-Key` on every AI request. The gateway resolves
+those headers per request and falls back to `.env` when they are absent, so the
+HTTP API stays usable on its own. `POST /llm/models` proxies `{base_url}/models`
+for the picker. Cached clients are keyed by URL and key hash; the rewrite cache
+key includes the model so switching models cannot return another model's result.
+
+**Consequences:** an empty plugin configuration means LanguageTool only, even
+when `.env` has an LLM. API keys live in SecretStorage and do not sync. Settings
+without a model leave AI off. `/llm/models` accepts arbitrary http(s) URLs, which
+is fine for a localhost gateway but must not be exposed without authentication.
+
 ## Phase 0 findings
 
 - LanguageTool: prebuilt image + bind-mounted `grammar_custom.xml` works; the
