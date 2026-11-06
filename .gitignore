@@ -38,6 +38,8 @@ data/logs/*
 !data/logs/.gitkeep
 data/cache/*
 !data/cache/.gitkeep
+data/wordbook/*
+!data/wordbook/.gitkeep
 
 # Local models
 models/

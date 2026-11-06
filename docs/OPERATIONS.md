@@ -30,7 +30,8 @@ uv run uvicorn ltplus.main:app --host 127.0.0.1 --port 8077
 LanguageTool uses `restart: unless-stopped`. The gateway and Ollama run
 natively and are restarted by whatever supervises them on the host; this repo
 does not install a service manager. Mode, prompt, rule, and dictionary edits
-need a gateway restart; dictionary edits apply on the next check.
+need a gateway restart; personal dictionary edits apply on the next check.
+Downloaded wordbook data applies immediately and needs no restart.
 
 ## What to back up
 
@@ -39,6 +40,7 @@ need a gateway restart; dictionary edits apply on the next check.
 | Gateway config | `.env` | Contains no secrets by default, but may hold an API key. Back it up securely, never commit it. |
 | Modes, prompts, rules, lexicon | `modes/`, `prompts/`, `rules/` | Tracked in git. |
 | Personal dictionary | `data/dictionary/*.txt` | Tracked in git; edit freely. |
+| Wordbook (hover dictionary) | `data/wordbook/` | Git-ignored and safe to delete; rebuild from the plugin settings or `scripts/build_dictionary.py`. |
 | Obsidian notes | Your vault | Back up separately; not part of this repo. |
 | LLM cache | Gateway memory | Volatile. Nothing to back up. |
 | LanguageTool data | Docker volume/image | None. The image is pull-only; no state. |

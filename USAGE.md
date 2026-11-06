@@ -190,6 +190,31 @@ possibly credentials.
 AI output is validated by the gateway before it reaches the plugin. Numbers,
 links, and code blocks are protected.
 
+### Hover dictionary
+
+Off by default and independent of the AI switch. In **Settings → LanguageTool →
+Dictionary**, turn on **Word meanings on hover**, pick a pair, then press
+**Download** once:
+
+| Pair | Shows |
+|---|---|
+| German – German | German definitions from German Wiktionary |
+| English → German | German translations for English words |
+| German → English | English translations for German words |
+
+The download runs in the gateway (about 350 MB of sources, a few minutes) and
+is written to `data/wordbook/`. The settings tab shows progress per pair. The
+same build can be run without Obsidian:
+
+```powershell
+python scripts/build_dictionary.py
+```
+
+After that, hover a word for half a second. The tooltip shows the headword,
+article and part of speech, and up to three senses. Inflected forms resolve to
+their base form (`Häuser → Haus`). Code, links, URLs, and frontmatter are
+skipped, and a miss stays silent. Lookup never calls the LLM.
+
 ## 8. Update
 
 From the repository root:

@@ -17,6 +17,8 @@ from ltplus.lexicon import load_lexicon, validate_modes
 from ltplus.modes import ModeConfigError, load_modes
 from ltplus.rewrite import RewriteCache, load_prompts
 from ltplus.rewrite import router as rewrite_router
+from ltplus.wordbook import Wordbook
+from ltplus.wordbook import router as wordbook_router
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -66,8 +68,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.lexicon = lexicon
     app.state.prompts = prompts
     app.state.rewrite_cache = RewriteCache(settings.llm_cache_size)
+    app.state.wordbook = Wordbook(settings.wordbook_dir)
     app.include_router(router)
     app.include_router(rewrite_router)
+    app.include_router(wordbook_router)
 
     @app.get("/healthz")
     def healthz() -> dict[str, str]:

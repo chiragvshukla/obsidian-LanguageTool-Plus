@@ -32,6 +32,7 @@ import {
 } from "./helpers";
 import { getDetectionResult, LanguageToolApiCredentials } from "./api";
 import { buildUnderlineExtension } from "./cm6/underlineExtension";
+import { buildDictionaryHover } from "./cm6/dictionaryHover";
 import {
   UnderlineEffect,
   addUnderline,
@@ -186,6 +187,7 @@ export default class LanguageToolPlugin extends Plugin {
     this.updateRibbonIcon();
 
     this.registerEditorExtension(buildUnderlineExtension(this));
+    this.registerEditorExtension(buildDictionaryHover(this));
 
     // Commands
     this.registerCommands();

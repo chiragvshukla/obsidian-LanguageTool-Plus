@@ -101,6 +101,25 @@ The model is slower than LanguageTool (seconds, not milliseconds), so AI
 auto-check is opt-in and scoped to one sentence. Explicit commands have no
 such cap beyond the gateway's `LLM_CONTEXT_CHARS`.
 
+## Hover dictionary
+
+Independent of the AI switch and off by default. Settings → Dictionary holds
+the toggle, the pair (German – German, English → German, German → English),
+per-pair status, and one Download button. The gateway builds the data on
+request; nothing is bundled with the plugin and no model is involved.
+
+The CodeMirror `hoverTooltip` waits 500 ms, extracts the word around the
+cursor, and skips frontmatter, code, links, and URLs using the Markdown syntax
+tree. It asks `GET /dictionary/lookup?word=…&pair=…` and stays silent on a miss
+or when the gateway is down. Results render the headword with the article from
+the source entry and its part of speech (`das Haus`, noun), plus up to three
+senses. German inflected forms are resolved by the gateway's alias
+index, so hovering `Häuser` shows `Haus`. Lookups are cached in memory for the
+session.
+
+The three data pairs live under `data/wordbook/` and are git-ignored. See
+ADR-018 and `THIRD_PARTY_NOTICES.md`.
+
 ## Fork changes (Phase 6)
 
 Implemented:
@@ -115,6 +134,8 @@ Implemented:
    underlines, plus a default-off paragraph auto-check.
 7. Per-category AI toggles (grammar, style, vocabulary), enforced by the
    gateway and sent on every `/rewrite` call.
+8. The local hover dictionary: settings, download status, and a CM6 hover
+   tooltip backed by the gateway.
 
 Do not modify the upstream request shape otherwise. Record the upstream commit
 in `plugins/obsidian/UPSTREAM.md` and keep the AGPL-3.0 license.

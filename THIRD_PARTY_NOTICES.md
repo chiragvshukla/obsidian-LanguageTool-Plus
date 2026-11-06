@@ -97,6 +97,25 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
+## Dictionary data, downloaded but not redistributed
+
+The gateway downloads these sources at the user's request and writes compact
+indexes under `data/wordbook/` (git-ignored). The original data is never
+committed to this repository.
+
+- **FreeDict German–English / English–German** —
+  https://freedict.org/ — Copyright Frank Richter, Einhard Leichtfuß, and
+  contributors. License: GNU GPL v2.0. Pinned to release `1.9-fd1` and
+  verified with the publisher's SHA-512 checksums.
+- **German Wiktionary extract (kaikki.org)** —
+  https://kaikki.org/dewiktionary/ — derived from
+  https://de.wiktionary.org/ by Tatu Ylonen's wiktextract. License:
+  CC BY-SA 3.0 and GFDL. The URL is unversioned and rotates weekly, so the
+  builder records the SHA-256 of the downloaded file in `SOURCES.json`.
+  The derived indexes keep the same license and attribution.
+
+The images in `plugins/obsidian/` are not affected.
+
 ## Services used, not redistributed
 
 These run as separate processes or images. No source is copied into this

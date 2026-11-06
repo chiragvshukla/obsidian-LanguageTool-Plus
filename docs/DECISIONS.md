@@ -298,6 +298,33 @@ two context sentences, so the change is effectively free. Only the checked
 sentence receives underlines; clicking one still accepts a change within that
 sentence.
 
+## ADR-018 — The hover dictionary is built locally, never by the LLM
+
+**Status:** accepted
+
+**Context:** the plugin already has an AI vocabulary hint, but a reader also
+wants to look up an arbitrary word without leaving the note. Sending every
+hover to a model would be slow, non-deterministic, costly, and would fail
+offline. The two existing FreeDict German/English dictionaries and the German
+Wiktionary extract cover the needed directions.
+
+**Decision:** the gateway downloads and parses the sources once, on request,
+and serves compact gzip JSONL indexes under `data/wordbook/`. FreeDict archives
+are pinned by SHA-512 from the publisher's API. The Wiktionary extract rotates
+weekly with no published checksum, so the builder records the SHA-256 it
+computed in `SOURCES.json` and validates the gzip stream while parsing. German
+inflected forms become an alias list pointing at their source form; lookup
+tries the direct index first, then aliases, and returns at most two entries so
+homographs stay visible. The plugin asks the gateway only after a 500 ms hover
+and stays silent on any miss. The feature has its own default-off setting and
+does not depend on the AI master switch.
+
+**Consequences:** the first build downloads roughly 350 MB and takes minutes;
+afterwards lookup is local and instant, and the generated data never enters
+git. Without a lemma tagger the alias index can be patchy for unusual forms;
+the cap of five aliases per form keeps homograph groups bounded. The indexes
+load lazily per pair, so a cold first hover can pause briefly.
+
 ## Phase 0 findings
 
 - LanguageTool: prebuilt image + bind-mounted `grammar_custom.xml` works; the

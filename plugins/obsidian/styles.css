@@ -286,6 +286,38 @@
   padding: 0 var(--size-2-1);
 }
 
+.lt-dict-tooltip {
+  max-width: 22em;
+  padding: var(--size-4-2) var(--size-4-3);
+}
+
+.lt-dict-headword {
+  font-weight: var(--font-semibold);
+}
+
+.lt-dict-article {
+  color: var(--text-muted);
+  font-weight: var(--font-normal);
+}
+
+.lt-dict-pos {
+  color: var(--text-faint);
+  font-size: var(--font-ui-smaller);
+  font-style: italic;
+  margin-left: var(--size-2-2);
+  font-weight: var(--font-normal);
+}
+
+.lt-dict-senses {
+  margin: var(--size-2-1) 0 0;
+  padding-left: var(--size-4-4);
+}
+
+.lt-dict-status {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+}
+
 .lt-suggestion-divider {
   border: none;
   border-top: 1px solid var(--background-modifier-border);

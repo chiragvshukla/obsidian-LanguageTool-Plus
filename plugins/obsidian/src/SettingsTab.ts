@@ -14,7 +14,17 @@ import {
 } from "obsidian";
 import LanguageToolPlugin from ".";
 import { logs } from "./api";
+import { fetchDictionaryStatus } from "./cm6/dictionaryHover";
+import { describeDictionaryStatus } from "./dictionaryHelpers";
 import { normalizeServerUrl } from "./helpers";
+
+const DICTIONARY_PAIRS = {
+  "de-de": "German – German",
+  "en-de": "English → German",
+  "de-en": "German → English"
+} as const;
+
+type DictionaryPair = keyof typeof DICTIONARY_PAIRS;
 
 const MinuteInSeconds = 60;
 const SecondToMillisecondConversion = 1000;
@@ -76,6 +86,11 @@ export interface LanguageToolPluginSettings {
   aiStyle?: boolean;
   aiVocabulary?: boolean;
   writingMode?: WritingMode;
+
+  // Hover dictionary. Independent of the AI switch; data is downloaded by
+  // the gateway and lookup never calls a model.
+  dictionaryHover?: boolean;
+  dictionaryPair?: DictionaryPair;
 }
 
 export const WRITING_MODES = {
@@ -111,7 +126,9 @@ export const DEFAULT_SETTINGS: LanguageToolPluginSettings = {
   aiGrammar: true,
   aiStyle: true,
   aiVocabulary: true,
-  writingMode: "neutral"
+  writingMode: "neutral",
+  dictionaryHover: false,
+  dictionaryPair: "de-de"
 };
 
 export function getServerUrl(value: string) {
@@ -182,9 +199,18 @@ function appendRuleListLink(setting: Setting): void {
 export class LanguageToolSettingsTab extends PluginSettingTab {
   private readonly plugin: LanguageToolPlugin;
   private languagesPromise?: Promise<LanguageToolLanguage[]>;
+  private dictionaryPoll: number | null = null;
   public constructor(app: App, plugin: LanguageToolPlugin) {
     super(app, plugin);
     this.plugin = plugin;
+  }
+
+  public hide(): void {
+    if (this.dictionaryPoll !== null) {
+      window.clearInterval(this.dictionaryPoll);
+      this.dictionaryPoll = null;
+    }
+    super.hide();
   }
 
   private configureAutoCheckDelaySlider(
@@ -289,6 +315,22 @@ export class LanguageToolSettingsTab extends PluginSettingTab {
     } else {
       this.display();
     }
+  }
+
+  private ensureDictionaryPoll(
+    update: () => Promise<boolean>
+  ): void {
+    if (this.dictionaryPoll !== null) {
+      return;
+    }
+    this.dictionaryPoll = window.setInterval(() => {
+      void update().then(building => {
+        if (!building && this.dictionaryPoll !== null) {
+          window.clearInterval(this.dictionaryPoll);
+          this.dictionaryPoll = null;
+        }
+      });
+    }, 2000);
   }
 
   private getSections(): SettingsSection[] {
@@ -876,6 +918,96 @@ export class LanguageToolSettingsTab extends PluginSettingTab {
       ]
     };
 
+    const dictionarySection: SettingsSection = {
+      heading: "Dictionary",
+      items: [
+        {
+          name: "Word meanings on hover",
+          desc:
+            "Show a short definition after hovering over a word. Off by default. Uses the downloaded dictionary, not the LLM.",
+          render: setting => {
+            setting.addToggle(component => {
+              component
+                .setValue(this.plugin.settings.dictionaryHover ?? false)
+                .onChange(async value => {
+                  this.plugin.settings.dictionaryHover = value;
+                  await this.plugin.saveSettings();
+                });
+            });
+          }
+        },
+        {
+          name: "Dictionary pair",
+          desc: "German – German shows German definitions; the other pairs show translations.",
+          render: setting => {
+            setting.addDropdown(component => {
+              for (const [pair, label] of Object.entries(DICTIONARY_PAIRS)) {
+                component.addOption(pair, label);
+              }
+              component
+                .setValue(this.plugin.settings.dictionaryPair ?? "de-de")
+                .onChange(async value => {
+                  this.plugin.settings.dictionaryPair = value as DictionaryPair;
+                  await this.plugin.saveSettings();
+                });
+            });
+          }
+        },
+        {
+          name: "Dictionary data",
+          desc:
+            "Downloaded from FreeDict and Wiktionary by the gateway. About 400 MB while downloading; the result is kept under data/wordbook.",
+          render: setting => {
+            const statusEl = setting.descEl.createDiv({
+              cls: "lt-dict-status",
+              text: "Checking…"
+            });
+            const update = async (): Promise<boolean> => {
+              const status = await fetchDictionaryStatus(
+                this.plugin.settings.serverUrl
+              );
+              statusEl.setText(
+                Object.entries(DICTIONARY_PAIRS)
+                  .map(
+                    ([pair, label]) =>
+                      `${label}: ${describeDictionaryStatus(status, pair)}`
+                  )
+                  .join(" ")
+              );
+              if (status?.error) {
+                statusEl.setText(`${statusEl.getText()} ${status.error}`);
+              }
+              return status?.building ?? false;
+            };
+            setting.addButton(button => {
+              button.setButtonText("Download").onClick(async () => {
+                const response = await requestUrl({
+                  url: `${this.plugin.settings.serverUrl}/dictionary/install`,
+                  method: "POST",
+                  throw: false
+                });
+                if (response.status !== 202) {
+                  new Notice("Could not start the dictionary download.");
+                } else {
+                  new Notice(
+                    "Dictionary download started. This takes a few minutes."
+                  );
+                }
+                if (await update()) {
+                  this.ensureDictionaryPoll(update);
+                }
+              });
+            });
+            void update().then(building => {
+              if (building) {
+                this.ensureDictionaryPoll(update);
+              }
+            });
+          }
+        }
+      ]
+    };
+
     const ruleSection: SettingsSection = {
       heading: "Rule Categories",
       items: [
@@ -954,7 +1086,14 @@ export class LanguageToolSettingsTab extends PluginSettingTab {
       ]
     };
 
-    return [mainSection, writingSection, aiSection, varietySection, ruleSection];
+    return [
+      mainSection,
+      writingSection,
+      aiSection,
+      dictionarySection,
+      varietySection,
+      ruleSection
+    ];
   }
 
   // Declarative settings (Obsidian 1.13+): rendering and settings search are

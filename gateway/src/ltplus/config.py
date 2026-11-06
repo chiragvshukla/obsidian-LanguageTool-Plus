@@ -44,8 +44,11 @@ class Settings(BaseSettings):
     rules_dir: Path = _ROOT / "rules"
     prompts_dir: Path = _ROOT / "prompts"
     dictionary_dir: Path = _ROOT / "data" / "dictionary"
+    wordbook_dir: Path = _ROOT / "data" / "wordbook"
 
-    @field_validator("modes_dir", "rules_dir", "prompts_dir", "dictionary_dir", mode="after")
+    @field_validator(
+        "modes_dir", "rules_dir", "prompts_dir", "dictionary_dir", "wordbook_dir", mode="after"
+    )
     @classmethod
     def _resolve_path(cls, value: Path) -> Path:
         if value.is_absolute():
