@@ -33,7 +33,7 @@ def test_mode_picky_wins_over_client_default(client: TestClient) -> None:
 
     client.post(
         "/v2/check",
-        data={"data": "{}", "language": "de-DE", "level": "default", "mode": "formal"},
+        data={"data": "{}", "language": "de-DE", "level": "default", "writing_mode": "formal"},
     )
 
     assert sent_form(route)["level"] == ["picky"]
@@ -45,7 +45,7 @@ def test_client_picky_wins_over_neutral_mode(client: TestClient) -> None:
 
     client.post(
         "/v2/check",
-        data={"data": "{}", "language": "de-DE", "level": "picky", "mode": "neutral"},
+        data={"data": "{}", "language": "de-DE", "level": "picky", "writing_mode": "neutral"},
     )
 
     assert sent_form(route)["level"] == ["picky"]
@@ -60,7 +60,7 @@ def test_disabled_categories_are_unioned(client: TestClient) -> None:
         data={
             "data": "{}",
             "language": "de-DE",
-            "mode": "casual",
+            "writing_mode": "casual",
             "disabledCategories": "CASING",
         },
     )
@@ -80,7 +80,7 @@ def test_enabled_categories_are_intersected(client: TestClient) -> None:
         data={
             "data": "{}",
             "language": "de-DE",
-            "mode": "academic",
+            "writing_mode": "academic",
             "enabledCategories": "STYLE,CASING",
         },
     )
@@ -98,7 +98,7 @@ def test_category_disabled_on_either_side_stays_disabled(client: TestClient) -> 
         data={
             "data": "{}",
             "language": "de-DE",
-            "mode": "formal",
+            "writing_mode": "formal",
             "enabledCategories": "STYLE",
             "disabledCategories": "STYLE",
         },
@@ -108,7 +108,9 @@ def test_category_disabled_on_either_side_stays_disabled(client: TestClient) -> 
 
 
 def test_unknown_mode_is_rejected(client: TestClient) -> None:
-    response = client.post("/v2/check", data={"data": "{}", "language": "de-DE", "mode": "nope"})
+    response = client.post(
+        "/v2/check", data={"data": "{}", "language": "de-DE", "writing_mode": "nope"}
+    )
 
     assert response.status_code == 400
     assert response.json()["error"]["code"] == "unknown_mode"
@@ -143,3 +145,73 @@ def test_languages_are_proxied(client: TestClient) -> None:
 
     assert response.status_code == 200
     assert response.json() == payload
+
+
+@respx.mock
+def test_languagetool_mode_is_forwarded(client: TestClient) -> None:
+    route = respx.post(CHECK_URL).mock(return_value=httpx.Response(200, json={"matches": []}))
+
+    response = client.post("/v2/check", data={"data": "{}", "language": "de-DE", "mode": "all"})
+
+    assert response.status_code == 200
+    assert sent_form(route)["mode"] == ["all"]
+
+
+@respx.mock
+def test_enabled_categories_are_unioned_when_client_sends_none(client: TestClient) -> None:
+    route = respx.post(CHECK_URL).mock(return_value=httpx.Response(200, json={"matches": []}))
+
+    client.post("/v2/check", data={"data": "{}", "language": "de-DE", "writing_mode": "academic"})
+
+    enabled = set(sent_form(route)["enabledCategories"][0].split(","))
+    assert {"STYLE", "REDUNDANCY", "TYPOGRAPHY", "GENDER_NEUTRALITY"} <= enabled
+
+
+@respx.mock
+def test_enabled_only_drops_disabled_categories(client: TestClient) -> None:
+    route = respx.post(CHECK_URL).mock(return_value=httpx.Response(200, json={"matches": []}))
+
+    response = client.post(
+        "/v2/check",
+        data={
+            "data": "{}",
+            "language": "de-DE",
+            "writing_mode": "neutral",
+            "enabledOnly": "true",
+            "enabledCategories": "GRAMMAR",
+        },
+    )
+
+    assert response.status_code == 200
+    assert "disabledCategories" not in sent_form(route)
+    assert sent_form(route)["enabledCategories"] == ["GRAMMAR"]
+
+
+@respx.mock
+def test_missing_language_uses_default(client: TestClient) -> None:
+    route = respx.post(CHECK_URL).mock(return_value=httpx.Response(200, json={"matches": []}))
+
+    client.post("/v2/check", data={"data": "{}"})
+
+    assert sent_form(route)["language"] == ["de-DE"]
+
+
+def test_non_utf8_body_is_rejected(client: TestClient) -> None:
+    response = client.post(
+        "/v2/check",
+        content=b"\xff\xfe",
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "invalid_body"
+
+
+@respx.mock
+def test_upstream_4xx_is_passed_through(client: TestClient) -> None:
+    respx.post(CHECK_URL).mock(return_value=httpx.Response(400, text="Error: bad language"))
+
+    response = client.post("/v2/check", data={"data": "{}", "language": "xx-XX"})
+
+    assert response.status_code == 400
+    assert response.text == "Error: bad language"

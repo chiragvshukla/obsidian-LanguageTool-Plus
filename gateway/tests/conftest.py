@@ -13,9 +13,11 @@ MODES_DIR = Path(__file__).resolve().parents[2] / "modes"
 @pytest.fixture
 def settings() -> Settings:
     return Settings(
+        _env_file=None,
         lt_url="http://lt.test",
         modes_dir=MODES_DIR,
         default_mode="neutral",
+        default_language="de-DE",
     )
 
 

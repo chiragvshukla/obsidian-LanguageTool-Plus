@@ -34,7 +34,7 @@ Frontmatter keys, in precedence order: `lt-language`, `language`, `lang`.
 Keep the patch small and upstream-friendly:
 
 1. Read `lt-mode` frontmatter (mirror `getDocumentLanguage`).
-2. Send it as a `mode` parameter.
+2. Send it as a `writing_mode` parameter.
 3. Add a mode selector to the settings/status UI.
 4. Add a "Rewrite selection" command that calls `POST /rewrite`.
 5. Do not modify the upstream request shape otherwise.
@@ -45,7 +45,7 @@ AGPL-3.0 license.
 ## Configuration
 
 - Endpoint: `http://127.0.0.1:8077` (the plugin appends `/v2`).
-- During Phase 0/1 before the gateway exists: `http://127.0.0.1:8010`.
+- `http://127.0.0.1:8010` is LanguageTool directly; modes do not apply.
 
 ## Out of scope
 

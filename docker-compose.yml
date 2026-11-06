@@ -4,7 +4,7 @@ name: languagetoolplus
 # the host and are addressed purely by URL (LT_URL, LLM_BASE_URL in .env).
 services:
   languagetool:
-    image: erikvl87/languagetool:latest
+    image: erikvl87/languagetool:6.8
     ports:
       - "127.0.0.1:8010:8010"
     environment:

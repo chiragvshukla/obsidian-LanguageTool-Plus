@@ -49,8 +49,8 @@ Ollama is expected to be running already, at the URL in `LLM_BASE_URL`
 gateway knows nothing about which one.
 
 In Obsidian, install the LanguageTool plugin and set its endpoint to
-`http://127.0.0.1:8077` (the plugin appends `/v2` itself). Until Phase 1 is
-implemented, point it at `http://127.0.0.1:8010` for plain LanguageTool.
+`http://127.0.0.1:8077` (the plugin appends `/v2` itself). Port `8010` is
+LanguageTool directly and does not apply writing modes.
 
 ## Configuration
 

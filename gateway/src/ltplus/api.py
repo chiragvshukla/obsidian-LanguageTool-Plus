@@ -30,6 +30,15 @@ def _error(status: int, code: str, message: str) -> JSONResponse:
     )
 
 
+def _relay(upstream: httpx.Response) -> Response:
+    """Return LanguageTool's body and status unchanged."""
+    return Response(
+        upstream.content,
+        status_code=upstream.status_code,
+        media_type=upstream.headers.get("content-type"),
+    )
+
+
 def _csv(value: str | None) -> list[str]:
     if not value:
         return []
@@ -71,7 +80,10 @@ def _apply_mode(params: dict[str, str], mode: Mode) -> None:
     else:
         params.pop("enabledCategories", None)
 
-    if disabled:
+    if params.get("enabledOnly", "").lower() == "true":
+        # LanguageTool rejects a disabled list when enabledOnly is true.
+        params.pop("disabledCategories", None)
+    elif disabled:
         params["disabledCategories"] = ",".join(disabled)
     else:
         params.pop("disabledCategories", None)
@@ -92,10 +104,10 @@ async def languages(request: Request) -> Response:
         logger.warning("languages request failed: %s", type(exc).__name__)
         return _upstream_error(exc)
 
-    if upstream.status_code >= 400:
+    if upstream.status_code >= 500:
         logger.warning("languages upstream status %s", upstream.status_code)
-        return _error(502, "languagetool_error", "LanguageTool rejected the request")
-    return Response(upstream.content, media_type="application/json")
+        return _error(502, "languagetool_error", "LanguageTool failed")
+    return _relay(upstream)
 
 
 @router.post("/v2/check")
@@ -108,14 +120,19 @@ async def check(request: Request) -> Response:
     if not content_type.startswith("application/x-www-form-urlencoded"):
         return _error(415, "unsupported_media_type", "Expected a form-urlencoded request body")
 
-    parsed = parse_qs((await request.body()).decode("utf-8"), keep_blank_values=True)
+    try:
+        body = (await request.body()).decode("utf-8")
+    except UnicodeDecodeError:
+        return _error(400, "invalid_body", "Request body must be UTF-8")
+    parsed = parse_qs(body, keep_blank_values=True)
     params = {key: values[-1] for key, values in parsed.items()}
 
-    mode_id = params.pop("mode", "") or settings.default_mode
+    mode_id = params.pop("writing_mode", "") or settings.default_mode
     mode = modes.get(mode_id)
     if mode is None:
         return _error(400, "unknown_mode", f"Unknown mode: {mode_id}")
 
+    params.setdefault("language", settings.default_language)
     _apply_mode(params, mode)
 
     try:
@@ -124,7 +141,7 @@ async def check(request: Request) -> Response:
         logger.warning("check request failed: %s", type(exc).__name__)
         return _upstream_error(exc)
 
-    if upstream.status_code >= 400:
+    if upstream.status_code >= 500:
         logger.warning("check upstream status %s", upstream.status_code)
-        return _error(502, "languagetool_error", "LanguageTool rejected the request")
-    return Response(upstream.content, media_type="application/json")
+        return _error(502, "languagetool_error", "LanguageTool failed")
+    return _relay(upstream)
