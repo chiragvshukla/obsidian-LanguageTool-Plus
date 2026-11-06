@@ -21,7 +21,8 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from ltplus.api import _apply_mode
 from ltplus.config import Settings
-from ltplus.llm import chat_json, llm_status
+from ltplus.jsonx import describe, extract_candidates
+from ltplus.llm import LLMAnswer, chat_json, llm_status
 from ltplus.llm_config import LLMConfigError, resolve_llm
 from ltplus.models import Mode
 from ltplus.rewrite import PromptError
@@ -281,12 +282,19 @@ def _topic_message(language: str, mode: Mode) -> str:
     )
 
 
-def _parse_score(content: str, label: str) -> ScoreOutput | JSONResponse:
-    try:
-        return ScoreOutput.model_validate(json.loads(content))
-    except (json.JSONDecodeError, ValidationError) as exc:
-        logger.warning("%s rejected: %s", label, exc)
-        return _error(502, "llm_validation_failed", "The model returned an invalid score")
+def _parse_output[T: BaseModel](answer: LLMAnswer, model: type[T], label: str) -> T | JSONResponse:
+    """Validate the first JSON candidate that fits. Never trusts the raw reply."""
+    for value in extract_candidates(answer.content):
+        try:
+            return model.model_validate(value)
+        except ValidationError:
+            continue
+    logger.warning("%s rejected: %s", label, describe(answer.content))
+    return _error(502, "llm_invalid_json", "The model did not return valid JSON")
+
+
+def _parse_score(answer: LLMAnswer, label: str) -> ScoreOutput | JSONResponse:
+    return _parse_output(answer, ScoreOutput, label)
 
 
 async def _llm_error(
@@ -297,7 +305,7 @@ async def _llm_error(
     user_message: str,
     name: str,
     model: type[BaseModel],
-) -> str | JSONResponse:
+) -> LLMAnswer | JSONResponse:
     messages: list[ChatCompletionMessageParam] = [
         {
             "role": "system",
@@ -364,7 +372,7 @@ async def score(request: Request) -> Response:
         return _error(400, "llm_not_configured", str(exc))
 
     if len(chunks) == 1:
-        content = await _llm_error(
+        answer = await _llm_error(
             client,
             settings,
             target.model,
@@ -373,15 +381,15 @@ async def score(request: Request) -> Response:
             "score",
             ScoreOutput,
         )
-        if isinstance(content, JSONResponse):
-            return content
-        parsed = _parse_score(content, "score")
+        if isinstance(answer, JSONResponse):
+            return answer
+        parsed = _parse_score(answer, "score")
         if isinstance(parsed, JSONResponse):
             return parsed
     else:
         sections: list[ScoreOutput] = []
         for index, chunk in enumerate(chunks, start=1):
-            content = await _llm_error(
+            answer = await _llm_error(
                 client,
                 settings,
                 target.model,
@@ -390,14 +398,14 @@ async def score(request: Request) -> Response:
                 "score",
                 ScoreOutput,
             )
-            if isinstance(content, JSONResponse):
-                return content
-            section = _parse_score(content, f"score section {index}/{len(chunks)}")
+            if isinstance(answer, JSONResponse):
+                return answer
+            section = _parse_score(answer, f"score section {index}/{len(chunks)}")
             if isinstance(section, JSONResponse):
                 return section
             sections.append(section)
 
-        content = await _llm_error(
+        answer = await _llm_error(
             client,
             settings,
             target.model,
@@ -406,9 +414,9 @@ async def score(request: Request) -> Response:
             "score-reduce",
             ScoreOutput,
         )
-        if isinstance(content, JSONResponse):
-            return content
-        parsed = _parse_score(content, "score reduce")
+        if isinstance(answer, JSONResponse):
+            return answer
+        parsed = _parse_score(answer, "score reduce")
         if isinstance(parsed, JSONResponse):
             return parsed
 
@@ -452,7 +460,7 @@ async def topic(request: Request) -> Response:
     except LLMConfigError as exc:
         return _error(400, "llm_not_configured", str(exc))
 
-    content = await _llm_error(
+    answer = await _llm_error(
         client,
         settings,
         target.model,
@@ -461,13 +469,11 @@ async def topic(request: Request) -> Response:
         "topic",
         TopicOutput,
     )
-    if isinstance(content, JSONResponse):
-        return content
+    if isinstance(answer, JSONResponse):
+        return answer
 
-    try:
-        parsed = TopicOutput.model_validate(json.loads(content))
-    except (json.JSONDecodeError, ValidationError) as exc:
-        logger.warning("topic rejected: %s", exc)
-        return _error(502, "llm_validation_failed", "The model returned an invalid topic")
+    parsed = _parse_output(answer, TopicOutput, "topic")
+    if isinstance(parsed, JSONResponse):
+        return parsed
 
     return JSONResponse({"topic": parsed.topic.strip(), "angle": parsed.angle.strip()})

@@ -7,6 +7,8 @@ fallback, and error mapping. Keeping that here means a change lands once.
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
+from typing import Any
 
 from openai import APIConnectionError, AsyncOpenAI, BadRequestError
 from openai.types.chat import ChatCompletionMessageParam
@@ -16,6 +18,25 @@ from pydantic import BaseModel
 from ltplus.config import Settings
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class LLMAnswer:
+    """One reply, with the metadata needed to explain a bad answer."""
+
+    content: str
+    finish_reason: str | None
+    has_reasoning: bool
+
+
+def _answer(response: Any) -> LLMAnswer:
+    choice = response.choices[0]
+    message = choice.message
+    return LLMAnswer(
+        content=message.content or "",
+        finish_reason=getattr(choice, "finish_reason", None),
+        has_reasoning=bool(getattr(message, "reasoning_content", None)),
+    )
 
 
 def _schema(name: str, model: type[BaseModel]) -> ResponseFormatJSONSchema:
@@ -33,14 +54,16 @@ async def chat_json(
     model: type[BaseModel],
     temperature: float,
     model_id: str,
-) -> str:
+    max_tokens: int | None = None,
+) -> LLMAnswer:
     """Call the endpoint once, falling back to `json_object` when needed."""
+    limit = max_tokens or settings.llm_max_tokens
     try:
         response = await client.chat.completions.create(
             model=model_id,
             messages=messages,
             temperature=temperature,
-            max_tokens=settings.llm_max_tokens,
+            max_tokens=limit,
             response_format=_schema(name, model),
         )
     except BadRequestError:
@@ -50,10 +73,10 @@ async def chat_json(
             model=model_id,
             messages=messages,
             temperature=temperature,
-            max_tokens=settings.llm_max_tokens,
+            max_tokens=limit,
             response_format=fallback,
         )
-    return response.choices[0].message.content or ""
+    return _answer(response)
 
 
 def llm_status(exc: Exception) -> tuple[int, str, str]:

@@ -148,8 +148,14 @@ Every response is validated before it is returned:
   checked alone; the unsafe ones are dropped and the rest is returned with
   `dropped: N` (ADR-021). If every change is unsafe, the request fails.
 
-A failed validation triggers one stricter retry. A second failure returns
-`502 llm_validation_failed`; unvalidated model text is never returned.
+Replies are parsed tolerantly before failing: think blocks, code fences, and
+prose around the object are stripped, and the last complete JSON object is
+used. If the reply was cut off at the token cap, one retry runs with twice the
+budget (capped at 16384). If no JSON object matches the schema, one repair call
+asks the model to reformat its own answer. Only then does the request fail with
+`llm_invalid_json`, `llm_truncated`, or `llm_empty_answer`. Each failure logs
+structure only — length, finish reason, and the presence of fences or a think
+block — never the text. Unvalidated model text is never returned.
 
 Names are not checked by a tokenizer. They rely on the LanguageTool re-check
 and on the user reviewing the diff before accepting.
@@ -157,8 +163,9 @@ and on the user reviewing the diff before accepting.
 ## Caching
 
 Successful rewrites are cached in process memory, keyed by text, language,
-mode, and instruction. The cache is an LRU bounded by `LLM_CACHE_SIZE` and is
-lost on restart. Errors and rejected responses are not cached.
+mode, instruction, allowed categories, context, and the endpoint/model pair.
+The cache is an LRU bounded by `LLM_CACHE_SIZE` and is lost on restart. Errors
+and rejected responses are not cached.
 
 ## Errors
 
@@ -171,7 +178,10 @@ lost on restart. Errors and rejected responses are not cached.
 | 413 | `text_too_long` | Input exceeds `LLM_CONTEXT_CHARS` |
 | 502 | `llm_invalid_request` | Endpoint rejected the request |
 | 502 | `llm_error` | Other upstream error |
-| 502 | `llm_validation_failed` | Both attempts failed validation |
+| 502 | `llm_invalid_json` | No reply matched the expected JSON shape |
+| 502 | `llm_truncated` | Reply hit the token cap before finishing |
+| 502 | `llm_empty_answer` | Reply had no content (reasoning-only or empty) |
+| 502 | `llm_validation_failed` | JSON was valid but failed the source checks |
 | 503 | `llm_unavailable` | Timeout or connection failure |
 | 503 | `languagetool_unavailable` | Re-check could not run |
 

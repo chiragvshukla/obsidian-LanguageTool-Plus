@@ -140,6 +140,16 @@ def test_topic_returns_blockquote_fields(client: TestClient, llm: FakeLLM) -> No
     assert "casual" in llm.last_messages[1]["content"]
 
 
+@respx.mock
+def test_topic_accepts_a_think_block(client: TestClient, llm: FakeLLM) -> None:
+    llm.replies = ["<think>Ich wähle ein Thema.</think>\n" + json.dumps(TOPIC)]
+
+    response = client.post("/topic", json={"language": "de-DE", "mode": "casual"})
+
+    assert response.status_code == 200
+    assert response.json() == TOPIC
+
+
 def test_score_rejects_unknown_mode(client: TestClient) -> None:
     response = client.post("/score", json={"text": "Text", "mode": "nope"})
 
@@ -168,9 +178,7 @@ def test_score_uses_map_reduce_for_long_text(client: TestClient, llm: FakeLLM) -
         "recommendations": ["final one", "final two", "final three", "ignored"],
     }
     llm.replies = [json.dumps(section)] * len(chunks) + [json.dumps(final)]
-    route = respx.post(CHECK_URL).mock(
-        return_value=httpx.Response(200, json={"matches": []})
-    )
+    route = respx.post(CHECK_URL).mock(return_value=httpx.Response(200, json={"matches": []}))
 
     response = client.post("/score", json={"text": text, "language": "de-DE"})
 
@@ -237,7 +245,18 @@ def test_score_rejects_invalid_model_output(client: TestClient, llm: FakeLLM) ->
     response = client.post("/score", json={"text": "Ein Text."})
 
     assert response.status_code == 502
-    assert response.json()["error"]["code"] == "llm_validation_failed"
+    assert response.json()["error"]["code"] == "llm_invalid_json"
+
+
+@respx.mock
+def test_score_accepts_fenced_json(client: TestClient, llm: FakeLLM) -> None:
+    llm.replies = [f"```json\n{json.dumps(SCORE)}\n```"]
+    respx.post(CHECK_URL).mock(return_value=httpx.Response(200, json={"matches": []}))
+
+    response = client.post("/score", json={"text": "Ein Text.", "language": "de-DE"})
+
+    assert response.status_code == 200
+    assert response.json()["grades"] == SCORE["grades"]
 
 
 def test_missing_practice_prompt_fails_loudly(tmp_path: Path) -> None:
@@ -249,12 +268,8 @@ def test_missing_practice_prompt_fails_loudly(tmp_path: Path) -> None:
 
 
 @respx.mock
-def test_score_applies_writing_mode_to_language_tool(
-    client: TestClient, llm: FakeLLM
-) -> None:
-    route = respx.post(CHECK_URL).mock(
-        return_value=httpx.Response(200, json={"matches": []})
-    )
+def test_score_applies_writing_mode_to_language_tool(client: TestClient, llm: FakeLLM) -> None:
+    route = respx.post(CHECK_URL).mock(return_value=httpx.Response(200, json={"matches": []}))
 
     response = client.post(
         "/score", json={"text": "Ein Text.", "language": "de-DE", "mode": "academic"}
@@ -278,9 +293,7 @@ def test_score_applies_writing_mode_to_language_tool(
 
 
 @respx.mock
-def test_score_chunks_long_text_for_language_tool(
-    client: TestClient, llm: FakeLLM
-) -> None:
+def test_score_chunks_long_text_for_language_tool(client: TestClient, llm: FakeLLM) -> None:
     text = "Ein Satz. " * 5000
     chunks = chunk_text(text, 12000)
     section = {
@@ -288,17 +301,14 @@ def test_score_chunks_long_text_for_language_tool(
         "recommendations": [],
     }
     llm.replies = [json.dumps(section)] * len(chunks) + [json.dumps(SCORE)]
-    route = respx.post(CHECK_URL).mock(
-        return_value=httpx.Response(200, json={"matches": []})
-    )
+    route = respx.post(CHECK_URL).mock(return_value=httpx.Response(200, json={"matches": []}))
 
     response = client.post("/score", json={"text": text, "language": "de-DE"})
 
     assert response.status_code == 200
     assert route.call_count == 2
     assert all(
-        len(parse_qs(call.request.content.decode())["text"][0]) <= 30_000
-        for call in route.calls
+        len(parse_qs(call.request.content.decode())["text"][0]) <= 30_000 for call in route.calls
     )
 
 

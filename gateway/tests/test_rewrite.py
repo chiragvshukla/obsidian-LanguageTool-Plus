@@ -27,18 +27,34 @@ class FakeLLM:
     """Stand-in for AsyncOpenAI: the real SDK uses its own HTTP stack."""
 
     def __init__(self) -> None:
-        self.replies: list[str | Exception] = [json.dumps({"changes": []})]
+        self.replies: list[Any] = [json.dumps({"changes": []})]
         self.calls = 0
         self.last_messages: list[dict[str, Any]] = []
+        self.last_max_tokens: int | None = None
+        self.reasoning = False
         self.chat = SimpleNamespace(completions=self)
 
     async def create(self, **kwargs: Any) -> Any:
         self.calls += 1
         self.last_messages = kwargs.get("messages", [])
+        self.last_max_tokens = kwargs.get("max_tokens")
         reply = self.replies.pop(0) if len(self.replies) > 1 else self.replies[0]
         if isinstance(reply, Exception):
             raise reply
-        return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content=reply))])
+        finish_reason = "stop"
+        if isinstance(reply, tuple):
+            reply, finish_reason = reply
+        return SimpleNamespace(
+            choices=[
+                SimpleNamespace(
+                    message=SimpleNamespace(
+                        content=reply,
+                        reasoning_content="thinking" if self.reasoning else None,
+                    ),
+                    finish_reason=finish_reason,
+                )
+            ]
+        )
 
     async def close(self) -> None:
         return None
@@ -127,7 +143,7 @@ def test_rewrite_reports_source_offsets_for_repeated_spans(
 
 
 @respx.mock
-def test_rewrite_retries_invalid_json_once(client: TestClient, llm: FakeLLM) -> None:
+def test_rewrite_repairs_invalid_json_once(client: TestClient, llm: FakeLLM) -> None:
     llm.replies = ["not json", completion(("ist", "war"))]
     respx.post(CHECK_URL).mock(return_value=httpx.Response(200, json={"matches": []}))
 
@@ -135,6 +151,7 @@ def test_rewrite_retries_invalid_json_once(client: TestClient, llm: FakeLLM) -> 
 
     assert response.status_code == 200
     assert llm.calls == 2
+    assert "not valid JSON" in llm.last_messages[-1]["content"]
 
 
 @respx.mock
@@ -144,7 +161,68 @@ def test_rewrite_rejects_two_invalid_replies(client: TestClient, llm: FakeLLM) -
     response = post(client)
 
     assert response.status_code == 502
-    assert response.json()["error"]["code"] == "llm_validation_failed"
+    assert response.json()["error"]["code"] == "llm_invalid_json"
+
+
+@respx.mock
+def test_rewrite_accepts_fenced_json(client: TestClient, llm: FakeLLM) -> None:
+    llm.replies = [f"```json\n{completion(('ist', 'war'))}\n```"]
+    respx.post(CHECK_URL).mock(return_value=httpx.Response(200, json={"matches": []}))
+
+    response = post(client)
+
+    assert response.status_code == 200
+    assert response.json()["rewritten"] == "Das war ein Test."
+
+
+@respx.mock
+def test_rewrite_accepts_json_after_a_think_block(client: TestClient, llm: FakeLLM) -> None:
+    llm.replies = [
+        '<think>Der Satz ist falsch.\nBeispiel: {"changes": []}</think>\n'
+        + completion(("ist", "war"))
+    ]
+    respx.post(CHECK_URL).mock(return_value=httpx.Response(200, json={"matches": []}))
+
+    response = post(client)
+
+    assert response.status_code == 200
+    assert response.json()["rewritten"] == "Das war ein Test."
+
+
+@respx.mock
+def test_rewrite_retries_a_truncated_reply_with_more_tokens(
+    client: TestClient, llm: FakeLLM
+) -> None:
+    llm.replies = [('{"changes": [', "length"), completion(("ist", "war"))]
+    respx.post(CHECK_URL).mock(return_value=httpx.Response(200, json={"matches": []}))
+
+    response = post(client)
+
+    assert response.status_code == 200
+    assert llm.calls == 2
+    assert llm.last_max_tokens == 8192
+
+
+@respx.mock
+def test_rewrite_reports_truncation(client: TestClient, llm: FakeLLM) -> None:
+    llm.replies = [('{"changes": [', "length")]
+
+    response = post(client)
+
+    assert response.status_code == 502
+    assert response.json()["error"]["code"] == "llm_truncated"
+    assert llm.calls == 2
+
+
+@respx.mock
+def test_rewrite_reports_an_empty_reasoning_reply(client: TestClient, llm: FakeLLM) -> None:
+    llm.replies = [""]
+    llm.reasoning = True
+
+    response = post(client)
+
+    assert response.status_code == 502
+    assert response.json()["error"]["code"] == "llm_empty_answer"
 
 
 @respx.mock
@@ -216,9 +294,7 @@ def test_rewrite_rejects_a_second_occurrence_of_a_known_rule(
     clean = httpx.Response(200, json={"matches": [one]})
     twice = httpx.Response(200, json={"matches": [one, one]})
     respx.post(CHECK_URL).mock(
-        side_effect=lambda request: (
-            twice if checked_text(request) == "Das war ein Test." else clean
-        )
+        side_effect=lambda request: twice if checked_text(request) == "Das war ein Test." else clean
     )
 
     response = post(client)
@@ -247,17 +323,13 @@ def test_rewrite_drops_overlapping_changes(client: TestClient, llm: FakeLLM) -> 
 
 
 @respx.mock
-def test_rewrite_drops_only_the_change_that_adds_an_error(
-    client: TestClient, llm: FakeLLM
-) -> None:
+def test_rewrite_drops_only_the_change_that_adds_an_error(client: TestClient, llm: FakeLLM) -> None:
     llm.replies = [completion(("gut", "gutt"), ("schlecht", "schlimm"))]
     bad = {"rule": {"id": "NEW_ERROR", "issueType": "misspelling"}}
     respx.post(CHECK_URL).mock(
         side_effect=lambda request: httpx.Response(
             200,
-            json={
-                "matches": [bad] if "gutt" in checked_text(request) else []
-            },
+            json={"matches": [bad] if "gutt" in checked_text(request) else []},
         )
     )
 
@@ -354,9 +426,7 @@ def categorized(*items: tuple[str, str, str]) -> str:
 
 @respx.mock
 def test_rewrite_drops_disabled_categories(client: TestClient, llm: FakeLLM) -> None:
-    llm.replies = [
-        categorized(("ist", "war", "style"), ("Test", "Versuch", "grammar"))
-    ]
+    llm.replies = [categorized(("ist", "war", "style"), ("Test", "Versuch", "grammar"))]
     respx.post(CHECK_URL).mock(return_value=httpx.Response(200, json={"matches": []}))
 
     response = post(client, categories=["grammar"])
@@ -397,9 +467,7 @@ def test_rewrite_sends_context_as_read_only(client: TestClient, llm: FakeLLM) ->
 
 
 @respx.mock
-def test_rewrite_rejects_a_change_from_the_context(
-    client: TestClient, llm: FakeLLM
-) -> None:
+def test_rewrite_rejects_a_change_from_the_context(client: TestClient, llm: FakeLLM) -> None:
     llm.replies = [completion(("Vorher", "Zuvor"))]
     respx.post(CHECK_URL).mock(return_value=httpx.Response(200, json={"matches": []}))
 
@@ -421,9 +489,7 @@ def test_rewrite_cache_key_includes_context(client: TestClient, llm: FakeLLM) ->
 
 
 @respx.mock
-def test_rewrite_cache_key_includes_categories(
-    client: TestClient, llm: FakeLLM
-) -> None:
+def test_rewrite_cache_key_includes_categories(client: TestClient, llm: FakeLLM) -> None:
     llm.replies = [completion(("ist", "war"))]
     respx.post(CHECK_URL).mock(return_value=httpx.Response(200, json={"matches": []}))
 
@@ -433,9 +499,7 @@ def test_rewrite_cache_key_includes_categories(
     assert llm.calls == 2
 
 
-def test_rewrite_without_categories_skips_the_model(
-    client: TestClient, llm: FakeLLM
-) -> None:
+def test_rewrite_without_categories_skips_the_model(client: TestClient, llm: FakeLLM) -> None:
     response = post(client, categories=[])
 
     assert response.status_code == 200

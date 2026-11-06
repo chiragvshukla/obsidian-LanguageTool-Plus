@@ -26,7 +26,8 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from ltplus.api import _apply_mode
 from ltplus.config import Settings
-from ltplus.llm import chat_json, llm_status
+from ltplus.jsonx import describe, extract_candidates
+from ltplus.llm import LLMAnswer, chat_json, llm_status
 from ltplus.llm_config import LLMConfigError, resolve_llm
 from ltplus.models import Mode
 
@@ -41,6 +42,19 @@ MAX_LENGTH_RATIO = 2.0
 # Above this many changes, validating each one is not worth the LanguageTool
 # calls; the whole set is checked once instead.
 MAX_SAFE_CHECKS = 12
+
+# A reply cut off at the token cap gets one retry with more room. The ceiling
+# stops a runaway model from asking for an unbounded budget.
+RETRY_MAX_TOKENS = 16384
+
+_TRUNCATED = (
+    "The model ran out of tokens before finishing. Raise LLM_MAX_TOKENS or "
+    "select a shorter passage."
+)
+_ONLY_REASONING = (
+    "The model returned only reasoning, not an answer. Raise LLM_MAX_TOKENS "
+    "or use a model that answers directly."
+)
 
 # Spans the model must not alter. Keep this list short and mechanical; names
 # are left to the LanguageTool re-check rather than guessed by a tokenizer.
@@ -207,8 +221,9 @@ async def _generate(
     categories: list[str] | None = None,
     context_before: str = "",
     context_after: str = "",
-) -> str:
-    """Call the endpoint once. Returns the raw message content."""
+    max_tokens: int | None = None,
+) -> LLMAnswer:
+    """Call the endpoint once. Returns the reply and its shape metadata."""
     system = prompt
     if strict:
         system += "\n\nReturn only valid JSON. No prose, no code fences."
@@ -220,7 +235,134 @@ async def _generate(
         },
     ]
 
-    return await chat_json(client, settings, messages, "rewrite", LLMOutput, temperature, model_id)
+    return await chat_json(
+        client,
+        settings,
+        messages,
+        "rewrite",
+        LLMOutput,
+        temperature,
+        model_id,
+        max_tokens,
+    )
+
+
+async def _repair(
+    client: AsyncOpenAI,
+    settings: Settings,
+    model_id: str,
+    prompt: str,
+    text: str,
+    instruction: str,
+    temperature: float,
+    previous: str,
+    categories: list[str] | None = None,
+    context_before: str = "",
+    context_after: str = "",
+) -> LLMAnswer | None:
+    """Ask once for the previous reply, reformatted as schema JSON."""
+    messages: list[ChatCompletionMessageParam] = [
+        {
+            "role": "system",
+            "content": prompt + "\n\nReturn only valid JSON. No prose, no code fences.",
+        },
+        {
+            "role": "user",
+            "content": _user_message(text, instruction, categories, context_before, context_after),
+        },
+        # The tail holds the answer; a long reasoning block would only burn
+        # context on the retry.
+        {"role": "assistant", "content": previous[-settings.llm_context_chars :]},
+        {
+            "role": "user",
+            "content": (
+                "Your previous answer was not valid JSON. Return the same "
+                "changes as one JSON object only, with no explanation."
+            ),
+        },
+    ]
+    try:
+        return await chat_json(
+            client,
+            settings,
+            messages,
+            "rewrite",
+            LLMOutput,
+            temperature,
+            model_id,
+        )
+    except (BadRequestError, APIConnectionError, APIStatusError) as exc:
+        # The first call worked, so this is usually transient. Fall through to
+        # the clearer invalid-JSON error instead of masking it.
+        logger.warning("rewrite repair failed: %s", type(exc).__name__)
+        return None
+
+
+def _interpret(
+    content: str, payload: RewriteRequest
+) -> tuple[tuple[str, list[LLMChange], list[tuple[int, int]], int] | None, str, bool]:
+    """Validate every JSON candidate. Returns (accepted, problem, schema_ok).
+
+    `schema_ok` is true when at least one candidate had the right shape, even
+    if it failed the source-text checks; only the former is worth repairing.
+    """
+    problem = "the response was not valid JSON"
+    schema_ok = False
+    for value in extract_candidates(content):
+        try:
+            parsed = LLMOutput.model_validate(value)
+        except ValidationError:
+            continue
+        schema_ok = True
+        parsed = LLMOutput(changes=_filter_changes(parsed.changes, payload.categories))
+        try:
+            rewritten, changes, spans = _validate_output(payload.text, parsed)
+        except ValidationFailure as exc:
+            problem = str(exc)
+            continue
+        return (
+            (
+                rewritten,
+                changes,
+                spans,
+                len(parsed.changes) - len(changes),
+            ),
+            "",
+            True,
+        )
+    return None, problem, schema_ok
+
+
+async def _verify_with_languagetool(
+    lt: httpx.AsyncClient,
+    language: str,
+    mode: Mode,
+    text: str,
+    accepted: tuple[str, list[LLMChange], list[tuple[int, int]], int],
+) -> tuple[tuple[str, list[LLMChange], list[tuple[int, int]], int] | None, str]:
+    """Reject a rewrite that adds correctness findings; keep the safe part."""
+    rewritten, changes, spans, dropped = accepted
+    before = await _finding_counts(lt, language, mode, text)
+    after = await _finding_counts(lt, language, mode, rewritten)
+    added = _added_findings(before, after)
+    if not added:
+        return accepted, ""
+
+    # Drop the changes that introduce a finding on their own. The rest stays
+    # useful instead of failing the whole check.
+    safe = await _drop_unsafe_changes(lt, language, mode, text, before, changes)
+    if safe is None or not safe:
+        return None, _added_message(added)
+    dropped += len(changes) - len(safe)
+    try:
+        rewritten, changes, spans = _validate_output(text, LLMOutput(changes=safe))
+    except ValidationFailure as exc:
+        return None, str(exc)
+    after = await _finding_counts(lt, language, mode, rewritten)
+    added = _added_findings(before, after)
+    if added:
+        return None, _added_message(added)
+    return (rewritten, changes, spans, dropped), ""
 
 
 def _apply_changes(
@@ -417,11 +559,32 @@ async def rewrite(request: Request) -> Response:
     if cached is not None:
         return JSONResponse(cached)
 
-    accepted: tuple[str, list[LLMChange], list[tuple[int, int]], int] | None = None
-    last_problem = ""
-    for strict in (False, True):
+    lt = request.app.state.lt
+    try:
+        answer = await _generate(
+            client,
+            settings,
+            target.model,
+            prompt,
+            payload.text,
+            payload.instruction,
+            mode.temperature,
+            False,
+            payload.categories,
+            payload.context_before,
+            payload.context_after,
+        )
+    except (BadRequestError, APIConnectionError, APIStatusError) as exc:
+        status, code, message = llm_status(exc)
+        return _error(status, code, message)
+
+    accepted, problem, schema_ok = _interpret(answer.content, payload)
+
+    # A reply cut off at the token cap gets one attempt with more room.
+    if accepted is None and answer.finish_reason == "length":
+        logger.warning("rewrite: reply hit the token cap, retrying with more room")
         try:
-            content = await _generate(
+            answer = await _generate(
                 client,
                 settings,
                 target.model,
@@ -429,58 +592,61 @@ async def rewrite(request: Request) -> Response:
                 payload.text,
                 payload.instruction,
                 mode.temperature,
-                strict,
+                True,
                 payload.categories,
                 payload.context_before,
                 payload.context_after,
+                min(settings.llm_max_tokens * 2, RETRY_MAX_TOKENS),
             )
         except (BadRequestError, APIConnectionError, APIStatusError) as exc:
             status, code, message = llm_status(exc)
             return _error(status, code, message)
+        accepted, problem, schema_ok = _interpret(answer.content, payload)
 
-        try:
-            parsed = LLMOutput.model_validate(json.loads(content))
-            parsed = LLMOutput(changes=_filter_changes(parsed.changes, payload.categories))
-            rewritten, changes, spans = _validate_output(payload.text, parsed)
-        except (json.JSONDecodeError, ValidationError):
-            last_problem = "the response was not valid JSON"
-            continue
-        except ValidationFailure as exc:
-            last_problem = str(exc)
-            continue
+    if accepted is None and not answer.content.strip():
+        logger.warning("rewrite unparseable: %s", describe(answer.content))
+        if answer.finish_reason == "length":
+            return _error(502, "llm_truncated", _TRUNCATED)
+        if answer.has_reasoning:
+            return _error(502, "llm_empty_answer", _ONLY_REASONING)
+        return _error(502, "llm_empty_answer", "The model returned an empty answer")
 
-        lt = request.app.state.lt
-        try:
-            before = await _finding_counts(lt, language, mode, payload.text)
-            after = await _finding_counts(lt, language, mode, rewritten)
-            added = _added_findings(before, after)
-            if added:
-                # Drop the changes that introduce a finding on their own. The
-                # rest stays useful instead of failing the whole check.
-                safe = await _drop_unsafe_changes(lt, language, mode, payload.text, before, changes)
-                if safe is None or not safe:
-                    last_problem = _added_message(added)
-                    continue
-                try:
-                    rewritten, changes, spans = _validate_output(
-                        payload.text, LLMOutput(changes=safe)
-                    )
-                except ValidationFailure as exc:
-                    last_problem = str(exc)
-                    continue
-                after = await _finding_counts(lt, language, mode, rewritten)
-                added = _added_findings(before, after)
-                if added:
-                    last_problem = _added_message(added)
-                    continue
-        except httpx.HTTPError:
-            return _error(503, "languagetool_unavailable", "LanguageTool is not reachable")
-        accepted = (rewritten, changes, spans, len(parsed.changes) - len(changes))
-        break
+    # The JSON shape failed, not the source checks: one reformat attempt.
+    if accepted is None and not schema_ok and answer.finish_reason != "length":
+        repaired = await _repair(
+            client,
+            settings,
+            target.model,
+            prompt,
+            payload.text,
+            payload.instruction,
+            mode.temperature,
+            answer.content,
+            payload.categories,
+            payload.context_before,
+            payload.context_after,
+        )
+        if repaired is not None:
+            answer = repaired
+            accepted, problem, schema_ok = _interpret(repaired.content, payload)
 
     if accepted is None:
-        logger.warning("rewrite rejected: %s", last_problem)
-        return _error(502, "llm_validation_failed", last_problem)
+        logger.warning("rewrite unparseable: %s", describe(answer.content))
+        if schema_ok:
+            return _error(502, "llm_validation_failed", problem)
+        if answer.finish_reason == "length":
+            return _error(502, "llm_truncated", _TRUNCATED)
+        return _error(502, "llm_invalid_json", "The model did not return valid JSON")
+
+    try:
+        accepted, problem = await _verify_with_languagetool(
+            lt, language, mode, payload.text, accepted
+        )
+    except httpx.HTTPError:
+        return _error(503, "languagetool_unavailable", "LanguageTool is not reachable")
+    if accepted is None:
+        logger.warning("rewrite rejected: %s", problem)
+        return _error(502, "llm_validation_failed", problem)
 
     rewritten, changes, spans, dropped = accepted
 
