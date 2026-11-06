@@ -22,9 +22,10 @@ against the gateway in pass-through mode.
 > serves `POST /rewrite`. Whole-document inline AI suggestions remain deferred;
 > see `docs/PLAN.md`.
 
-> **Built with AI (vibe coding).** This is a personal project, developed largely
-> with AI coding assistants. Changes are reviewed and tested before use, but
-> expect rough edges and verify anything you depend on.
+> **Built with AI (open-weight models).** This is a personal project, developed
+> largely with AI coding assistants running open-weight models. Changes are
+> reviewed and tested before use, but expect rough edges and verify anything
+> you depend on.
 >
 > **AI features.** Rewrites, AI checks, and the optional paragraph auto-check
 > send text to the OpenAI-compatible endpoint you configure, which defaults to a
@@ -43,6 +44,9 @@ against the gateway in pass-through mode.
   `503 llm_unavailable`.
 
 ## Quick start
+
+For the full install, plugin build, update, and troubleshooting walkthrough,
+see [`USAGE.md`](USAGE.md).
 
 ```powershell
 Copy-Item .env.example .env
@@ -95,6 +99,7 @@ See `AGENTS.md` §5 and `docs/ARCHITECTURE.md`.
 
 ## Documentation
 
+- [`USAGE.md`](USAGE.md) — install, run, build, update, troubleshoot
 - `docs/PLAN.md` — phases and acceptance criteria
 - `docs/ARCHITECTURE.md` — components and request flow
 - `docs/OPERATIONS.md` — health checks, restart, backup, restore
