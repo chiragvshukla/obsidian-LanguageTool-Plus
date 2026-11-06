@@ -126,7 +126,7 @@ Smoke-test a rewrite through the gateway:
 ```powershell
 Invoke-RestMethod http://127.0.0.1:8077/rewrite `
   -Method Post `
-  -ContentType "application/json" `
+  -ContentType "application/json; charset=utf-8" `
   -Body '{"text":"Der Mädchen geht zur Schule.","language":"de-DE","mode":"neutral"}'
 ```
 
