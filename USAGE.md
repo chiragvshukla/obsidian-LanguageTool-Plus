@@ -151,6 +151,8 @@ Configure the plugin under **Settings → LanguageTool Integration**:
 - **Language:** German, English, or automatic detection.
 - **Writing mode:** `neutral`, `formal`, `casual`, `academic`, or `business`.
 - **Enable AI features:** off by default. Required for rewrites and AI checks.
+- **AI grammar / style / vocabulary:** which suggestions the model may return,
+  all on by default. Turn one off to skip that kind of hint everywhere.
 - **AI auto-check current sentence:** optional, off by default. Waits 4
   seconds after typing, then checks the sentence around the cursor.
 - The status-bar **Aa** icon and the ribbon icon open the same menu: check the

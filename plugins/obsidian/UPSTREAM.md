@@ -21,10 +21,12 @@ unmodified upstream files except where listed below. The upstream `test/` and
 
 1. **AI switch, rewrite, and AI checking**
    - `src/SettingsTab.ts`: added `enableAIFeatures` (default `false`),
-     `aiAutoCheck` (default `false`), and `writingMode` (default `neutral`) to
+     `aiAutoCheck` (default `false`), `aiGrammar`/`aiStyle`/`aiVocabulary`
+     (default `true`), and `writingMode` (default `neutral`) to
      the settings, plus a "Writing" section and an "AI features" section.
      `WRITING_MODES`/`isWritingMode` are exported for validation.
-   - `src/rewrite.ts`: new. Calls `POST {serverUrl}/rewrite` on the gateway and
+   - `src/rewrite.ts`: new. Calls `POST {serverUrl}/rewrite` on the gateway,
+     sending the enabled AI categories when one is switched off, and
      shows the result in a review modal, with changed spans highlighted.
    - `src/aiCheck.ts`: new. Converts validated rewrite changes into
      LanguageTool-shaped matches, finds the paragraph around the cursor, and

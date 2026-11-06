@@ -413,6 +413,18 @@ export default class LanguageToolPlugin extends Plugin {
    * setting, then a short LanguageTool detection probe. Without the probe an
    * English selection would fall back to the gateway's German default.
    */
+  /**
+   * Categories the user has switched on. Undefined means all, so the gateway
+   * can leave its prompt and cache untouched in the common case.
+   */
+  private getAiCategories(): string[] | undefined {
+    const enabled: string[] = [];
+    if (this.settings.aiGrammar ?? true) enabled.push("grammar");
+    if (this.settings.aiStyle ?? true) enabled.push("style");
+    if (this.settings.aiVocabulary ?? true) enabled.push("vocabulary");
+    return enabled.length === 3 ? undefined : enabled;
+  }
+
   private async getRewriteLanguage(text: string): Promise<string | undefined> {
     const file = this.app.workspace.getActiveFile();
     const pinned = getDocumentLanguage(this.app, file);
@@ -445,7 +457,8 @@ export default class LanguageToolPlugin extends Plugin {
       this.settings,
       text,
       language,
-      mode
+      mode,
+      this.getAiCategories()
     );
 
     if (rewritten === text) {
@@ -472,7 +485,8 @@ export default class LanguageToolPlugin extends Plugin {
       this.settings,
       text,
       language,
-      mode
+      mode,
+      this.getAiCategories()
     );
 
     const view = editorToCodeMirror(editor);
@@ -556,7 +570,8 @@ export default class LanguageToolPlugin extends Plugin {
         this.settings,
         range.text,
         language,
-        mode
+        mode,
+        this.getAiCategories()
       ));
     } catch (e) {
       console.error(e);

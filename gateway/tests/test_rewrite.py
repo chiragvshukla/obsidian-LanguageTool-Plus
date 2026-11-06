@@ -28,10 +28,12 @@ class FakeLLM:
     def __init__(self) -> None:
         self.replies: list[str | Exception] = [json.dumps({"changes": []})]
         self.calls = 0
+        self.last_messages: list[dict[str, Any]] = []
         self.chat = SimpleNamespace(completions=self)
 
     async def create(self, **kwargs: Any) -> Any:
         self.calls += 1
+        self.last_messages = kwargs.get("messages", [])
         reply = self.replies.pop(0) if len(self.replies) > 1 else self.replies[0]
         if isinstance(reply, Exception):
             raise reply
@@ -232,6 +234,74 @@ def test_rewrite_rejects_long_text(client: TestClient) -> None:
 def test_prompt_must_be_a_file_name() -> None:
     with pytest.raises(ValidationError, match="prompt must be a file name"):
         Mode(id="test", label="Test", prompt="../evil.md")
+
+
+def categorized(*items: tuple[str, str, str]) -> str:
+    return json.dumps(
+        {
+            "changes": [
+                {
+                    "original": original,
+                    "replacement": replacement,
+                    "category": category,
+                    "explanation": "test",
+                }
+                for original, replacement, category in items
+            ]
+        }
+    )
+
+
+@respx.mock
+def test_rewrite_drops_disabled_categories(client: TestClient, llm: FakeLLM) -> None:
+    llm.replies = [
+        categorized(("ist", "war", "style"), ("Test", "Versuch", "grammar"))
+    ]
+    respx.post(CHECK_URL).mock(return_value=httpx.Response(200, json={"matches": []}))
+
+    response = post(client, categories=["grammar"])
+
+    assert response.status_code == 200
+    assert response.json()["rewritten"] == "Das ist ein Versuch."
+    assert [change["category"] for change in response.json()["changes"]] == ["grammar"]
+
+
+@respx.mock
+def test_rewrite_tells_the_model_which_categories_are_allowed(
+    client: TestClient, llm: FakeLLM
+) -> None:
+    llm.replies = [completion(("ist", "war"))]
+    respx.post(CHECK_URL).mock(return_value=httpx.Response(200, json={"matches": []}))
+
+    post(client, categories=["grammar"])
+
+    user_message = llm.last_messages[-1]["content"]
+    assert "Change only these categories:" in user_message
+    assert "grammar (spelling, grammar, punctuation)" in user_message
+    assert "vocabulary (" not in user_message
+
+
+@respx.mock
+def test_rewrite_cache_key_includes_categories(
+    client: TestClient, llm: FakeLLM
+) -> None:
+    llm.replies = [completion(("ist", "war"))]
+    respx.post(CHECK_URL).mock(return_value=httpx.Response(200, json={"matches": []}))
+
+    post(client, categories=["grammar"])
+    post(client, categories=["grammar", "style"])
+
+    assert llm.calls == 2
+
+
+def test_rewrite_without_categories_skips_the_model(
+    client: TestClient, llm: FakeLLM
+) -> None:
+    response = post(client, categories=[])
+
+    assert response.status_code == 200
+    assert response.json()["changes"] == []
+    assert llm.calls == 0
 
 
 def test_missing_prompt_fails_startup(tmp_path: Path) -> None:

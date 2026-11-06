@@ -248,6 +248,30 @@ deferred.
 `shortcut: auto-check is one sentence and 2,000 characters, add chunking if
 whole-note AI checking becomes a use case.`
 
+## ADR-016 — AI categories are filtered in the gateway
+
+**Status:** accepted
+
+**Context:** users want correctness help without unsolicited phrasing advice,
+or want only the foreign-word hint. Skipping suggestions in the plugin would
+still pay for the model and could drop a grammar fix that a style rewrite
+absorbed.
+
+**Decision:** `POST /rewrite` accepts `categories`, a list drawn from `grammar`,
+`style`, and `vocabulary`. The gateway adds a policy line to the user message,
+drops returned changes outside the list before validation, and includes the
+sorted set in the cache key. `None` means all categories; an empty list returns
+no changes without calling the model. The plugin sends the list only when a
+category is switched off, so the default path is unchanged. Three settings
+under "Enable AI features" default to on; the master switch stays the only
+off switch.
+
+**Consequences:** the model is told to keep each change in one category rather
+than bundle a rewrite, but a small model can still mislabel a change; the
+gateway filter trusts the label it returns. With only `grammar` enabled, wording
+suggestions are dropped rather than partially applied, and a span needing both
+kinds of fix gets only the enabled part.
+
 ## Phase 0 findings
 
 - LanguageTool: prebuilt image + bind-mounted `grammar_custom.xml` works; the

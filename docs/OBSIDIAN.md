@@ -88,6 +88,10 @@ are validated by the gateway before the plugin sees them.
   document, switch writing mode, run the AI actions, toggle automatic checking,
   and clear suggestions. AI entries are hidden while AI features are off;
   selection actions stay disabled without a selection.
+- The three AI category toggles (grammar, style, vocabulary) are sent as
+  `categories` on every `/rewrite` call. All on is the default and sends no
+  list. Switching one off is enforced by the gateway, not only hidden by the
+  plugin.
 
 The model is slower than LanguageTool (seconds, not milliseconds), so AI
 auto-check is opt-in and scoped to one sentence. Explicit commands have no
@@ -105,6 +109,8 @@ Implemented:
 5. Changed-span highlighting in the rewrite review modal.
 6. A "Check selection with AI" command that renders model changes as normal
    underlines, plus a default-off paragraph auto-check.
+7. Per-category AI toggles (grammar, style, vocabulary), enforced by the
+   gateway and sent on every `/rewrite` call.
 
 Do not modify the upstream request shape otherwise. Record the upstream commit
 in `plugins/obsidian/UPSTREAM.md` and keep the AGPL-3.0 license.

@@ -71,6 +71,10 @@ export interface LanguageToolPluginSettings {
   // AI features are opt-in. Every AI command checks this flag first.
   enableAIFeatures?: boolean;
   aiAutoCheck?: boolean;
+  /** Which AI suggestion categories are allowed. Missing means on. */
+  aiGrammar?: boolean;
+  aiStyle?: boolean;
+  aiVocabulary?: boolean;
   writingMode?: WritingMode;
 }
 
@@ -104,6 +108,9 @@ export const DEFAULT_SETTINGS: LanguageToolPluginSettings = {
 
   enableAIFeatures: false,
   aiAutoCheck: false,
+  aiGrammar: true,
+  aiStyle: true,
+  aiVocabulary: true,
   writingMode: "neutral"
 };
 
@@ -795,6 +802,51 @@ export class LanguageToolSettingsTab extends PluginSettingTab {
                 .setValue(this.plugin.settings.enableAIFeatures ?? false)
                 .onChange(async value => {
                   this.plugin.settings.enableAIFeatures = value;
+                  await this.plugin.saveSettings();
+                });
+            });
+          }
+        },
+        {
+          name: "AI grammar corrections",
+          desc:
+            "Let the model fix spelling, grammar, and punctuation. On by default.",
+          render: setting => {
+            setting.addToggle(component => {
+              component
+                .setValue(this.plugin.settings.aiGrammar ?? true)
+                .onChange(async value => {
+                  this.plugin.settings.aiGrammar = value;
+                  await this.plugin.saveSettings();
+                });
+            });
+          }
+        },
+        {
+          name: "AI style suggestions",
+          desc:
+            "Let the model suggest wording, tone, and register changes. On by default.",
+          render: setting => {
+            setting.addToggle(component => {
+              component
+                .setValue(this.plugin.settings.aiStyle ?? true)
+                .onChange(async value => {
+                  this.plugin.settings.aiStyle = value;
+                  await this.plugin.saveSettings();
+                });
+            });
+          }
+        },
+        {
+          name: "AI vocabulary suggestions",
+          desc:
+            "Suggest the text's language for a word written in another one, for example German for an English word. On by default.",
+          render: setting => {
+            setting.addToggle(component => {
+              component
+                .setValue(this.plugin.settings.aiVocabulary ?? true)
+                .onChange(async value => {
+                  this.plugin.settings.aiVocabulary = value;
                   await this.plugin.saveSettings();
                 });
             });

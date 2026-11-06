@@ -33,14 +33,18 @@ export async function requestRewrite(
   settings: LanguageToolPluginSettings,
   text: string,
   language?: string,
-  mode?: string
+  mode?: string,
+  categories?: string[]
 ): Promise<RewriteResult> {
-  const body: Record<string, string> = {
+  const body: Record<string, string | string[]> = {
     text,
     mode: mode ?? settings.writingMode ?? "neutral"
   };
   if (language) {
     body.language = language;
+  }
+  if (categories) {
+    body.categories = categories;
   }
 
   const res = await requestUrl({

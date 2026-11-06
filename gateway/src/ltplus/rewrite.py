@@ -72,6 +72,19 @@ class RewriteRequest(BaseModel):
     language: str = "de-DE"
     mode: str | None = None
     instruction: str = ""
+    # Allowed change categories. None means all; an empty list means none.
+    categories: list[str] | None = None
+
+
+# Categories the plugin can show. Anything else is ignored in `categories`.
+KNOWN_CATEGORIES = ("grammar", "style", "vocabulary")
+
+# Short definition per category, so the model classifies changes as intended.
+CATEGORY_LABELS = {
+    "grammar": "spelling, grammar, punctuation",
+    "style": "wording, tone, register",
+    "vocabulary": "a word written in another language",
+}
 
 
 class RewriteCache:
@@ -79,15 +92,15 @@ class RewriteCache:
 
     def __init__(self, size: int) -> None:
         self._size = max(1, size)
-        self._items: OrderedDict[tuple[str, str, str, str], dict[str, Any]] = OrderedDict()
+        self._items: OrderedDict[tuple[str, str, str, str, str], dict[str, Any]] = OrderedDict()
 
-    def get(self, key: tuple[str, str, str, str]) -> dict[str, Any] | None:
+    def get(self, key: tuple[str, str, str, str, str]) -> dict[str, Any] | None:
         value = self._items.get(key)
         if value is not None:
             self._items.move_to_end(key)
         return value
 
-    def put(self, key: tuple[str, str, str, str], value: dict[str, Any]) -> None:
+    def put(self, key: tuple[str, str, str, str, str], value: dict[str, Any]) -> None:
         self._items[key] = value
         self._items.move_to_end(key)
         while len(self._items) > self._size:
@@ -120,11 +133,41 @@ def _error(status: int, code: str, message: str) -> JSONResponse:
     return JSONResponse({"error": {"code": code, "message": message}}, status_code=status)
 
 
-def _user_message(text: str, instruction: str) -> str:
+def _user_message(
+    text: str, instruction: str, categories: list[str] | None = None
+) -> str:
     message = f"Text to revise:\n<<<\n{text}\n>>>"
+    if categories is not None:
+        allowed = [
+            f"{category} ({CATEGORY_LABELS[category]})"
+            for category in categories
+            if category in KNOWN_CATEGORIES
+        ]
+        message += (
+            "\n\nChange only these categories: "
+            f"{'; '.join(allowed)}. Leave everything else as it is, and "
+            "keep each change to one category instead of bundling several."
+        )
     if instruction:
         message += f"\n\nAdditional instruction: {instruction}"
     return message
+
+
+def _categories_key(categories: list[str] | None) -> str:
+    """Cache key part: requests with different allowed sets must not collide."""
+    if categories is None:
+        return "*"
+    return ",".join(sorted(set(categories) & set(KNOWN_CATEGORIES)))
+
+
+def _filter_changes(
+    changes: list[LLMChange], categories: list[str] | None
+) -> list[LLMChange]:
+    """Drop changes the client has switched off."""
+    if categories is None:
+        return changes
+    allowed = set(categories) & set(KNOWN_CATEGORIES)
+    return [change for change in changes if change.category in allowed]
 
 
 def _schema() -> ResponseFormatJSONSchema:
@@ -142,6 +185,7 @@ async def _generate(
     instruction: str,
     temperature: float,
     strict: bool,
+    categories: list[str] | None = None,
 ) -> str:
     """Call the endpoint once. Returns the raw message content."""
     system = prompt
@@ -149,7 +193,7 @@ async def _generate(
         system += "\n\nReturn only valid JSON. No prose, no code fences."
     messages: list[ChatCompletionMessageParam] = [
         {"role": "system", "content": system},
-        {"role": "user", "content": _user_message(text, instruction)},
+        {"role": "user", "content": _user_message(text, instruction, categories)},
     ]
 
     try:
@@ -262,7 +306,19 @@ async def rewrite(request: Request) -> Response:
             f"Text exceeds {settings.llm_context_chars} characters; select a shorter passage",
         )
 
-    key = (language, mode.id, payload.instruction, payload.text)
+    # Nothing to ask when the client switched every category off.
+    if payload.categories is not None and not payload.categories:
+        return JSONResponse(
+            {"original": payload.text, "rewritten": payload.text, "changes": []}
+        )
+
+    key = (
+        language,
+        mode.id,
+        payload.instruction,
+        payload.text,
+        _categories_key(payload.categories),
+    )
     cache: RewriteCache = request.app.state.rewrite_cache
     cached = cache.get(key)
     if cached is not None:
@@ -281,6 +337,7 @@ async def rewrite(request: Request) -> Response:
                 payload.instruction,
                 mode.temperature,
                 strict,
+                payload.categories,
             )
         except BadRequestError as exc:
             logger.warning("LLM rejected the request: %s", exc.status_code)
@@ -293,6 +350,9 @@ async def rewrite(request: Request) -> Response:
 
         try:
             parsed = LLMOutput.model_validate(json.loads(content))
+            parsed = LLMOutput(
+                changes=_filter_changes(parsed.changes, payload.categories)
+            )
             rewritten, changes, spans = _validate_output(payload.text, parsed)
         except (json.JSONDecodeError, ValidationError):
             last_problem = "the response was not valid JSON"
