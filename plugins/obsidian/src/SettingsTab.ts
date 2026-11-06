@@ -1077,7 +1077,7 @@ export class LanguageToolSettingsTab extends PluginSettingTab {
         {
           name: "AI auto-check current sentence",
           desc:
-            "After 4 seconds without typing, check the sentence around the cursor. Off by default; AI features must be enabled. LT checks still run instantly.",
+            "After 4 seconds without typing or moving the cursor, check the sentence around the cursor. Off by default; AI features must be enabled. LT checks still run instantly.",
           render: setting => {
             setting.addToggle(component => {
               component

@@ -89,13 +89,13 @@ the gateway before the plugin sees them.
   unchanged. A note that needs more than 20 sections is refused; check a
   selection instead. Rewrite stays selection-only.
 - **AI auto-check current sentence** is a separate, default-off toggle. After
-  4 seconds without typing it checks the sentence around the cursor (at most
-  2,000 characters). The rest of the paragraph is sent as `context_before` /
-  `context_after` (up to 1,000 characters per side) so pronouns and references
-  resolve; the model may not change or return the context, and only sentence
-  changes become underlines. The cursor is read when the pause ends, so
-  cursor-only
-  updates and clicks do not cancel a pending check; any edit invalidates it.
+  4 seconds without typing or moving the cursor it checks the sentence around
+  the cursor (at most 2,000 characters). Moving the cursor therefore checks
+  older sentences too, not only the one just typed. The rest of the paragraph
+  is sent as `context_before` / `context_after` (up to 1,000 characters per
+  side) so pronouns and references resolve; the model may not change or return
+  the context, and only sentence changes become underlines. Any edit or further
+  cursor move restarts the 4-second wait.
   Failed or stale checks are dropped silently. An empty result does not erase
   existing AI underlines; only an explicit check replaces them. LT checking
   stays instant and independent, and an LT check now clears only its own

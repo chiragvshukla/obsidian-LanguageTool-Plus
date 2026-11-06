@@ -28,7 +28,11 @@ export function buildAutoCheckHandler(plugin: LanguageToolPlugin) {
 
     return {
       update(update: ViewUpdate) {
-        if (!update.docChanged) {
+        // A cursor move is a selection-only update. It must still arm the AI
+        // pass, so a sentence the user did not just type can be checked.
+        const cursorSettled =
+          update.selectionSet && update.state.selection.main.empty;
+        if (!update.docChanged && !update.selectionSet) {
           return;
         }
 
@@ -38,7 +42,15 @@ export function buildAutoCheckHandler(plugin: LanguageToolPlugin) {
           return;
         }
 
-        if (shouldAutoCheck(plugin, view)) {
+        // A non-empty selection has no single sentence to check. Drop a pending
+        // pass so selecting text does not fire one.
+        if (!update.docChanged && !cursorSettled) {
+          window.clearTimeout(aiTimer);
+          aiTimer = -1;
+          return;
+        }
+
+        if (update.docChanged && shouldAutoCheck(plugin, view)) {
           // Keep positions accumulated from earlier edits valid in the new doc
           if (minRange !== Infinity) {
             minRange = update.changes.mapPos(minRange, -1);
