@@ -29,7 +29,8 @@ unmodified upstream files except where listed below. The upstream `test/` and
    - `src/aiCheck.ts`: new. Converts validated rewrite changes into
      LanguageTool-shaped matches, finds the paragraph around the cursor, and
      extracts the sentence inside it for the automatic pass.
-     `style` changes get the `STYLE` category (purple), others `GRAMMAR`.
+     `style` changes get the `STYLE` category (purple), `vocabulary` gets
+     `VOCABULARY` (blue), others `GRAMMAR`.
    - `src/index.ts`: added "Rewrite selection with AI", "Check selection with
      AI", and "Check current paragraph with AI". All are hidden unless
      `enableAIFeatures` is on; the checks use the note's resolved writing mode.

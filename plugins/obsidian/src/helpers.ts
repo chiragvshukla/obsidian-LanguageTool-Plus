@@ -193,6 +193,8 @@ export function getIssueTypeClassName(categoryId: string) {
     case "REDUNDANCY":
     case "STYLE":
       return "lt-style";
+    case "VOCABULARY":
+      return "lt-word";
     case "PUNCTUATION":
     case "TYPOS":
       return "lt-major";

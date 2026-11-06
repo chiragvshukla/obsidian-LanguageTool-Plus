@@ -15,6 +15,10 @@
   box-shadow: inset 0 -2px #8981f3;
 }
 
+.lt-underline.lt-word {
+  box-shadow: inset 0 -2px #4c9aff;
+}
+
 .lt-underline.lt-minor:hover {
   background-color: #e9b35f21;
 }
@@ -25,6 +29,10 @@
 
 .lt-underline.lt-style:hover {
   background-color: #8981f321;
+}
+
+.lt-underline.lt-word:hover {
+  background-color: #4c9aff21;
 }
 
 /* AI hints keep the category colour but use a dashed line, so they are
@@ -47,6 +55,10 @@
 
 .lt-underline.lt-ai.lt-style {
   text-decoration-color: #8981f3;
+}
+
+.lt-underline.lt-ai.lt-word {
+  text-decoration-color: #4c9aff;
 }
 
 @keyframes lineInserted {
@@ -207,6 +219,10 @@
 
 .lt-style .lt-title > span {
   box-shadow: inset 0 -2px #8981f388;
+}
+
+.lt-word .lt-title > span {
+  box-shadow: inset 0 -2px #4c9aff88;
 }
 
 .lt-loading > svg {

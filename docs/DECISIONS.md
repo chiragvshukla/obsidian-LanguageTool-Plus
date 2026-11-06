@@ -224,7 +224,8 @@ depend on a slow, stochastic service.
 "Check selection with AI" command that sends the note's resolved writing mode,
 converts each validated change into an `AI_GRAMMAR` match, and draws it even
 where a deterministic LT underline already exists. The change category sets the
-underline colour (`style` purple, grammar amber) and AI underlines are dashed,
+underline colour (`style` purple, grammar amber, `vocabulary` blue) and AI
+underlines are dashed,
 so a phrasing suggestion is distinguishable from a grammar catch and from LT.
 Overlapping hints share one popover with a section per suggestion, so neither is
 hidden. Add a separate, default-off "AI auto-check current sentence" setting:

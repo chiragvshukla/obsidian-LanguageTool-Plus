@@ -67,8 +67,9 @@ are validated by the gateway before the plugin sees them.
   LanguageTool-shaped underline (`rule.id` = `AI_GRAMMAR`) with the model's
   replacement and explanation, so the existing popover, jump, ignore, and
   accept-suggestion commands work unchanged. The category picks the colour:
-  `style` is purple and grammar is amber, and AI underlines are dashed while LT
-  underlines stay solid. AI spans are drawn even when they overlap deterministic
+  `style` is purple, grammar is amber, and a vocabulary suggestion (a word in
+  the text's language) is blue; AI underlines are dashed while LT underlines
+  stay solid. AI spans are drawn even when they overlap deterministic
   LT underlines; clicking the shared text shows one popover with a section per
   suggestion, each with its own buttons and Ignore. A deletion has no
   replacement button, but still shows its explanation.

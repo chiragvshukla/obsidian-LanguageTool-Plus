@@ -42,14 +42,21 @@ export function changesToMatches(
       continue;
     }
     cursor = offset + length;
-    const isStyle = change.category === "style";
+    // The gateway prompt asks for `vocabulary` when it suggests a word in the
+    // text's language, so those hints get their own colour.
+    const kind =
+      change.category === "vocabulary"
+        ? { short: "AI word", issue: "vocabulary", id: "VOCABULARY", name: "Vocabulary" }
+        : change.category === "style"
+        ? { short: "AI style", issue: "style", id: "STYLE", name: "Style" }
+        : { short: "AI grammar", issue: "grammar", id: "GRAMMAR", name: "Grammar" };
     matches.push({
       message:
         change.explanation ||
         (change.replacement
           ? `${change.original} → ${change.replacement}`
           : `Remove "${change.original}"`),
-      shortMessage: isStyle ? "AI style" : "AI grammar",
+      shortMessage: kind.short,
       // An empty replacement is a removal hint: the popover shows the
       // explanation and Ignore, but no button it cannot apply.
       replacements: change.replacement
@@ -62,14 +69,9 @@ export function changesToMatches(
       type: { typeName: "Other" },
       rule: {
         id: AI_RULE_ID,
-        description: isStyle
-          ? "AI style suggestion"
-          : "AI grammar suggestion",
-        issueType: isStyle ? "style" : "grammar",
-        category: {
-          id: isStyle ? "STYLE" : "GRAMMAR",
-          name: isStyle ? "Style" : "Grammar"
-        }
+        description: `${kind.short} suggestion`,
+        issueType: kind.issue,
+        category: { id: kind.id, name: kind.name }
       },
       ignoreForIncompleteSentence: false,
       contextForSureMatch: 0

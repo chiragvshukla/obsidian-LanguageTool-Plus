@@ -11,6 +11,7 @@ Regeln:
 - Entferne Füllwörter, Floskeln und Wiederholungen.
 - Halte den Ton höflich, aber nicht unterwürfig.
 - Ändere nur die betroffenen Stellen, nicht ganze Absätze.
+- Steht ein Wort in einer anderen Sprache als der übrige Text, schlage die passende deutsche Entsprechung vor; Ausnahme sind Namen, Marken und übliche Fachbegriffe. Setze dafür "category" auf "vocabulary".
 - Erkläre jede Änderung in einem kurzen Satz.
 - Setze "category" auf "grammar" für Rechtschreibung, Grammatik und Zeichensetzung, sonst auf "style".
 

@@ -30,6 +30,15 @@ equal(matches[0].rule.id, "AI_GRAMMAR");
 equal([matches[0].rule.category.id, matches[0].shortMessage], ["GRAMMAR", "AI grammar"]);
 equal([matches[3].rule.category.id, matches[3].shortMessage], ["STYLE", "AI style"]);
 
+// A word suggested in the text's language gets the blue vocabulary category.
+const vocabulary = changesToMatches(0, "Die address ist falsch.", [
+  { original: "address", replacement: "Anschrift", category: "vocabulary" }
+]);
+equal(
+  [vocabulary[0].rule.category.id, vocabulary[0].shortMessage],
+  ["VOCABULARY", "AI word"]
+);
+
 const withEmoji = "😀 Der Mädchen geht.";
 const emojiMatches = changesToMatches(0, withEmoji, [
   // Python counts code points, JS counts UTF-16 units, so this offset is off.
