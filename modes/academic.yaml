@@ -7,6 +7,7 @@ enabled_categories:
   - REDUNDANCY
   - TYPOGRAPHY
   - GENDER_NEUTRALITY
+  - LT_PLUS
 disabled_categories:
   - COLLOQUIALISMS
 prompt: prompts/de/academic.md

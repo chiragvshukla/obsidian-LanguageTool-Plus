@@ -125,6 +125,37 @@ def test_term_rule_is_off_in_other_modes(tmp_path: Path) -> None:
 
 
 @respx.mock
+def test_term_rule_respects_enabled_only(tmp_path: Path) -> None:
+    (tmp_path / "lexicon.yaml").write_text(LEXICON, encoding="utf-8")
+    respx.post(CHECK_URL).mock(return_value=httpx.Response(200, json={"matches": []}))
+
+    with make_client(tmp_path) as client:
+        off = client.post(
+            "/v2/check",
+            data={
+                "data": annotated("Ein Email hier"),
+                "language": "de-DE",
+                "writing_mode": "formal",
+                "enabledOnly": "true",
+                "enabledCategories": "STYLE",
+            },
+        )
+        on = client.post(
+            "/v2/check",
+            data={
+                "data": annotated("Ein Email hier"),
+                "language": "de-DE",
+                "writing_mode": "formal",
+                "enabledOnly": "true",
+                "enabledCategories": "LT_PLUS",
+            },
+        )
+
+    assert off.json()["matches"] == []
+    assert [match["rule"]["id"] for match in on.json()["matches"]] == ["EMAIL_HYPHEN"]
+
+
+@respx.mock
 def test_term_rule_respects_disabled_rules(tmp_path: Path) -> None:
     (tmp_path / "lexicon.yaml").write_text(LEXICON, encoding="utf-8")
     respx.post(CHECK_URL).mock(return_value=httpx.Response(200, json={"matches": []}))
