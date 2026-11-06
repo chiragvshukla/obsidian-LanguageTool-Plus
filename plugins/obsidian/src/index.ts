@@ -35,6 +35,8 @@ import {
   UnderlineEffect,
   addUnderline,
   clearAIUnderlinesInRange,
+  clearLTUnderlines,
+  clearLTUnderlinesInRange,
   clearUnderlines,
   clearUnderlinesInRange,
   ignoreUnderline,
@@ -382,6 +384,26 @@ export default class LanguageToolPlugin extends Plugin {
         return true;
       }
     });
+
+    this.addCommand({
+      id: "ltai-check-paragraph",
+      name: "Check current paragraph with AI",
+      editorCheckCallback: (checking, editor) => {
+        if (!this.settings.enableAIFeatures) {
+          return false;
+        }
+        if (checking) {
+          return true;
+        }
+        this.checkParagraphWithAI(editorToCodeMirror(editor), true).catch(
+          e => {
+            console.error(e);
+            new Notice(e instanceof Error ? e.message : String(e), 8000);
+          }
+        );
+        return true;
+      }
+    });
   }
 
   /**
@@ -466,40 +488,54 @@ export default class LanguageToolPlugin extends Plugin {
   }
 
   /**
-   * Automatic check for the paragraph around the cursor. Called by the
-   * debounced handler; it fails silently so typing is never interrupted.
+   * Check the paragraph around the cursor. The automatic pass is silent; the
+   * command passes `manual` so it reports its result and runs even when
+   * automatic checking is off.
    */
   public async checkParagraphWithAI(
     view: EditorView,
-    pos: number
+    manual = false
   ): Promise<void> {
-    if (
-      !this.settings.enableAIFeatures ||
-      !this.settings.aiAutoCheck ||
-      !view.hasFocus ||
-      !view.state.selection.main.empty
-    ) {
+    if (!this.settings.enableAIFeatures) {
+      return;
+    }
+    if (!manual && (!this.settings.aiAutoCheck || !view.hasFocus)) {
+      return;
+    }
+    if (!manual && !view.state.selection.main.empty) {
       return;
     }
 
+    const pos = view.state.selection.main.head;
     const file = this.app.workspace.getActiveFile();
     const frontmatterEnd = file
       ? this.app.metadataCache.getFileCache(file)?.frontmatterPosition?.end
           .offset
       : undefined;
     if (frontmatterEnd !== undefined && pos <= frontmatterEnd) {
+      if (manual) {
+        new Notice("Place the cursor in the note body, not the frontmatter");
+      }
       return;
     }
 
     const paragraph = paragraphAt(view.state.doc, pos);
-    if (
-      !paragraph ||
-      paragraph.text.trim().length < 8 ||
-      paragraph.text.length > AI_AUTO_MAX_CHARS
-    ) {
+    if (!paragraph || paragraph.text.trim().length < 8) {
+      if (manual) {
+        new Notice("Nothing to check here");
+      }
+      return;
+    }
+    if (paragraph.text.length > AI_AUTO_MAX_CHARS) {
+      if (manual) {
+        new Notice(
+          `Paragraph is too long for one AI pass (${AI_AUTO_MAX_CHARS} characters). Select part of it and use Check selection with AI.`
+        );
+      }
       return;
     }
 
+    const doc = view.state.doc;
     const generation = ++this.aiCheckGeneration;
     const language = await this.getRewriteLanguage(paragraph.text);
     if (generation !== this.aiCheckGeneration) {
@@ -516,30 +552,58 @@ export default class LanguageToolPlugin extends Plugin {
       ));
     } catch (e) {
       console.error(e);
+      if (manual) {
+        new Notice(e instanceof Error ? e.message : String(e), 8000);
+      }
       return;
     }
 
     if (
       generation !== this.aiCheckGeneration ||
+      view.state.doc !== doc ||
       !this.settings.enableAIFeatures ||
-      !this.settings.aiAutoCheck ||
-      view.state.doc.sliceString(paragraph.from, paragraph.to) !==
-        paragraph.text
+      (!manual && !this.settings.aiAutoCheck)
     ) {
+      if (manual) {
+        new Notice("AI check discarded: the note changed while checking");
+      }
       return;
     }
 
-    this.addAIUnderlines(view, paragraph.from, paragraph.text, changes);
+    const count = this.addAIUnderlines(
+      view,
+      paragraph.from,
+      paragraph.text,
+      changes,
+      manual
+    );
+    if (manual) {
+      let message = "AI found no issues";
+      if (count > 0) {
+        message = `AI found ${count} suggestion${count === 1 ? "" : "s"}`;
+      } else if (changes.length > 0) {
+        message = "AI suggestions could not be shown inline";
+      }
+      new Notice(message, 4000);
+    }
   }
 
-  /** Draw AI matches through the existing underline, popover, and accept UI. */
+  /**
+   * Draw AI matches through the existing underline, popover, and accept UI.
+   * An automatic pass leaves existing AI underlines alone when it finds
+   * nothing, so a background result cannot silently erase a visible hint.
+   */
   private addAIUnderlines(
     view: EditorView,
     baseOffset: number,
     text: string,
-    changes: RewriteChange[]
+    changes: RewriteChange[],
+    replaceEmpty = true
   ): number {
     const matches = changesToMatches(baseOffset, text, changes);
+    if (!replaceEmpty && matches.length === 0) {
+      return 0;
+    }
     const occupied: { from: number; to: number }[] = [];
     view.state
       .field(underlineField)
@@ -565,6 +629,9 @@ export default class LanguageToolPlugin extends Plugin {
       }
       effects.push(addUnderline.of({ from, to, match }));
       added += 1;
+    }
+    if (!replaceEmpty && added === 0) {
+      return 0;
     }
     view.dispatch({ effects });
     return added;
@@ -879,13 +946,13 @@ export default class LanguageToolPlugin extends Plugin {
 
     if (isRange) {
       effects.push(
-        clearUnderlinesInRange.of({
+        clearLTUnderlinesInRange.of({
           from: rangeFrom,
           to: rangeTo
         })
       );
     } else {
-      effects.push(clearUnderlines.of(null));
+      effects.push(clearLTUnderlines.of(null));
     }
 
     if (res.matches) {

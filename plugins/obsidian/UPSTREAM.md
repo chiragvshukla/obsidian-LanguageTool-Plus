@@ -28,13 +28,15 @@ unmodified upstream files except where listed below. The upstream `test/` and
      shows the result in a review modal, with changed spans highlighted.
    - `src/aiCheck.ts`: new. Converts validated rewrite changes into
      LanguageTool-shaped matches and finds the paragraph around the cursor.
-   - `src/index.ts`: added "Rewrite selection with AI" and "Check selection
-     with AI". Both are hidden unless `enableAIFeatures` is on and the editor
-     has a non-empty selection. The check command always uses `neutral`.
+   - `src/index.ts`: added "Rewrite selection with AI", "Check selection with
+     AI", and "Check current paragraph with AI". All are hidden unless
+     `enableAIFeatures` is on; the two checks always use `neutral`.
    - `src/cm6/buildAutoCheckHandler.ts`: optional 10-second paragraph check
-     when `aiAutoCheck` is on; the slow model pass never delays LT checks.
-   - `src/cm6/underlineStateField.ts`: `clearAIUnderlinesInRange`, so a new AI
-     pass replaces only its own underlines.
+     when `aiAutoCheck` is on. Cursor-only updates do not cancel it; the cursor
+     is read when the pause ends, and edits invalidate the result.
+   - `src/cm6/underlineStateField.ts`: `clearAIUnderlinesInRange` replaces only
+     AI underlines; `clearLTUnderlines`/`clearLTUnderlinesInRange` let an LT
+     check clear only its own underlines, so AI hints survive a re-check.
 
 2. **Writing modes on checks**
    - `src/api.ts`: sends `writing_mode` on `/v2/check` when `urlMode` is

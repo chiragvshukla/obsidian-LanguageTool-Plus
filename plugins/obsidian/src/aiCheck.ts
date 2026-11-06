@@ -1,4 +1,4 @@
-import { Text } from "@codemirror/state";
+import type { Text } from "@codemirror/state";
 import type { MatchesEntity } from "./LanguageToolTypings";
 import type { RewriteChange } from "./rewrite";
 
@@ -6,6 +6,14 @@ export const AI_RULE_ID = "AI_GRAMMAR";
 
 /** Longest paragraph the automatic pass sends to the model. */
 export const AI_AUTO_MAX_CHARS = 2000;
+
+/** Whether a CodeMirror decoration holds one of our AI matches. */
+export function isAIUnderline(value: { spec?: unknown }): boolean {
+  const spec = value.spec as
+    | { match?: { rule?: { id?: string } } }
+    | undefined;
+  return spec?.match?.rule?.id === AI_RULE_ID;
+}
 
 /** Turn validated rewrite changes into matches the existing UI can render. */
 export function changesToMatches(

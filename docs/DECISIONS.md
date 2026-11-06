@@ -232,7 +232,10 @@ changed-span highlighting in the review modal.
 **Consequences:** AI hints look and behave like normal LT suggestions, including
 accept, ignore, and jump. Auto-check can spend a request on a paragraph the
 user has left, and the model can flag correct text; that is why it is opt-in
-and scoped. Whole-document checking and paragraph chunking remain deferred.
+and scoped. Cursor-only updates do not cancel the debounce; the cursor is read
+when the pause ends. LT checks clear only their own underlines so they cannot
+erase AI hints, and an empty automatic AI result leaves existing hints in
+place. Whole-document checking and paragraph chunking remain deferred.
 `shortcut: auto-check is one paragraph and 2,000 characters, add chunking if
 whole-note AI checking becomes a use case.`
 

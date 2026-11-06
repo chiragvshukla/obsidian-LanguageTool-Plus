@@ -1,5 +1,5 @@
 import { Text } from "@codemirror/state";
-import { changesToMatches, paragraphAt } from "./aiCheck";
+import { changesToMatches, isAIUnderline, paragraphAt } from "./aiCheck";
 
 function equal(actual: unknown, expected: unknown) {
   if (JSON.stringify(actual) !== JSON.stringify(expected)) {
@@ -37,3 +37,9 @@ equal(paragraph, {
   text: "second para\ncontinues"
 });
 equal(paragraphAt(doc, doc.line(2).from), null);
+
+const aiDecoration = { spec: { match: { rule: { id: "AI_GRAMMAR" } } } };
+const ltDecoration = { spec: { match: { rule: { id: "MORFOLOGIK_RULE_DE_DE" } } } };
+equal(isAIUnderline(aiDecoration), true);
+equal(isAIUnderline(ltDecoration), false);
+equal(isAIUnderline({}), false);

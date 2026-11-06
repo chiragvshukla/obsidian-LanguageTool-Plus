@@ -67,11 +67,17 @@ are validated by the gateway before the plugin sees them.
   replacement and explanation, so the existing popover, jump, ignore, and
   accept-suggestion commands work unchanged. Spans that overlap deterministic
   LT underlines are skipped.
+- **Check current paragraph with AI** runs the same pass on the paragraph around
+  the cursor, without needing a selection. It reports its result or error in a
+  notice and works even when automatic checking is off.
 - **AI auto-check current paragraph** is a separate, default-off toggle. After
   10 seconds without typing it checks the paragraph around the cursor (at most
-  2,000 characters), then clears and redraws only its own AI underlines.
-  Moving the cursor or typing again discards the pending check. Failed or stale
-  checks are dropped silently. LT checking stays instant and independent.
+  2,000 characters). The cursor is read when the pause ends, so cursor-only
+  updates and clicks do not cancel a pending check; any edit invalidates it.
+  Failed or stale checks are dropped silently. An empty result does not erase
+  existing AI underlines; only an explicit check replaces them. LT checking
+  stays instant and independent, and an LT check now clears only its own
+  underlines, so an automatic LT pass cannot wipe visible AI hints.
 
 The model is slower than LanguageTool (seconds, not milliseconds), so AI
 auto-check is opt-in and scoped to one paragraph. Explicit commands have no

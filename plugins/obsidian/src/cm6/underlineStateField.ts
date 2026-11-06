@@ -8,6 +8,7 @@ import {
   ignoreListRegEx
 } from "../helpers";
 import { MatchesEntity } from "../LanguageToolTypings";
+import { isAIUnderline } from "../aiCheck";
 
 export interface UnderlineEffect {
   from: number;
@@ -22,6 +23,11 @@ export const clearUnderlinesInRange = StateEffect.define<{
   to: number;
 }>();
 export const clearAIUnderlinesInRange = StateEffect.define<{
+  from: number;
+  to: number;
+}>();
+export const clearLTUnderlines = StateEffect.define();
+export const clearLTUnderlinesInRange = StateEffect.define<{
   from: number;
   to: number;
 }>();
@@ -222,12 +228,22 @@ export const underlineField = StateField.define<DecorationSet>({
       } else if (e.is(clearAIUnderlinesInRange)) {
         underlines = underlines.update({
           filter: (from, to, value) => {
-            const spec = value.spec as { match?: MatchesEntity } | undefined;
-            if (spec?.match?.rule.id !== "AI_GRAMMAR") {
+            if (!isAIUnderline(value)) {
               return true;
             }
             return filterUnderlines(from, to, e.value.from, e.value.to);
           }
+        });
+      } else if (e.is(clearLTUnderlines)) {
+        // LT checks must not erase AI hints they cannot reproduce.
+        underlines = underlines.update({
+          filter: (_from, _to, value) => isAIUnderline(value)
+        });
+      } else if (e.is(clearLTUnderlinesInRange)) {
+        underlines = underlines.update({
+          filter: (from, to, value) =>
+            isAIUnderline(value) ||
+            filterUnderlines(from, to, e.value.from, e.value.to)
         });
       } else if (e.is(clearUnderlinesInRange) || e.is(ignoreUnderline)) {
         underlines = underlines.update({

@@ -25,16 +25,9 @@ export function buildAutoCheckHandler(plugin: LanguageToolPlugin) {
     let minRange = Infinity;
     let maxRange = -Infinity;
     let aiTimer = -1;
-    let aiPosition = 0;
 
     return {
       update(update: ViewUpdate) {
-        // Moving the cursor abandons a pending check of the old paragraph.
-        if (update.selectionSet && aiTimer !== -1) {
-          window.clearTimeout(aiTimer);
-          aiTimer = -1;
-        }
-
         if (!update.docChanged) {
           return;
         }
@@ -81,10 +74,12 @@ export function buildAutoCheckHandler(plugin: LanguageToolPlugin) {
 
         if (plugin.settings.enableAIFeatures && plugin.settings.aiAutoCheck) {
           window.clearTimeout(aiTimer);
-          aiPosition = update.state.selection.main.head;
           aiTimer = window.setTimeout(() => {
             aiTimer = -1;
-            plugin.checkParagraphWithAI(view, aiPosition).catch(e => {
+            // Read the cursor when the pause ends: Obsidian emits
+            // selection-only updates while typing, and they must not cancel
+            // the check.
+            plugin.checkParagraphWithAI(view).catch(e => {
               console.error(e);
             });
           }, AI_AUTO_CHECK_DELAY_MS);
