@@ -1,16 +1,19 @@
 # LLM contract
 
+The LLM is optional at runtime. `POST /v2/check` never calls it; only an
+explicit `POST /rewrite` does. If the endpoint is down, inline checking keeps
+working.
+
 ## Endpoint
 
 Any OpenAI-compatible server:
 
 ```
 POST {LLM_BASE_URL}/chat/completions
-GET  {LLM_BASE_URL}/models
 ```
 
-Ollama exposes this at `http://127.0.0.1:11434/v1`. Use the official `openai`
-SDK pointed at `LLM_BASE_URL`; do not hand-roll HTTP.
+Ollama exposes this at `http://127.0.0.1:11434/v1`. The gateway uses the
+official `openai` SDK, so no provider-specific fields are sent.
 
 ## Configuration
 
@@ -21,18 +24,68 @@ SDK pointed at `LLM_BASE_URL`; do not hand-roll HTTP.
 | `LLM_MODEL` | Model identifier | `gemma4:e4b-it-q4_K_M` |
 | `LLM_TIMEOUT_SECONDS` | Per-request timeout | `30` |
 | `LLM_MAX_TOKENS` | Response cap | `1024` |
-| `LLM_CONTEXT_CHARS` | Conservative chunk budget | `12000` |
+| `LLM_CONTEXT_CHARS` | Maximum rewrite input, in characters | `12000` |
+| `LLM_CACHE_SIZE` | Successful rewrites kept in memory | `128` |
 
 No model name is hard-coded in source. Model choice belongs to configuration.
+
+## `POST /rewrite`
+
+Request (JSON):
+
+```json
+{
+  "text": "Das ist ein Tset.",
+  "language": "de-DE",
+  "mode": "formal",
+  "instruction": "Kürzer, bitte."
+}
+```
+
+- `text` is required and must not exceed `LLM_CONTEXT_CHARS`.
+- `language` defaults to `DEFAULT_LANGUAGE`. Prompts exist for `de` and `en`.
+- `mode` defaults to `DEFAULT_MODE`.
+- `instruction` is optional.
+
+Response:
+
+```json
+{
+  "original": "Das ist ein Tset.",
+  "rewritten": "Das ist ein Test.",
+  "changes": [
+    {
+      "original": "Tset",
+      "replacement": "Test",
+      "category": "grammar",
+      "explanation": "Tippfehler"
+    }
+  ]
+}
+```
+
+Changes are applied by the gateway, in order, to produce `rewritten`. The
+plugin only needs `rewritten`; `changes` exist for review UI.
+
+## Prompts
+
+`prompts/<language>/<mode>.md`, where the mode file names only the file
+(`prompt: formal.md`). All modes must have a prompt for every language
+directory; a missing file is a startup error. Editing a prompt needs a gateway
+restart.
 
 ## Request shape
 
 Standard fields only: `model`, `messages`, `temperature`, `max_tokens`,
-`response_format`, `stream`. No provider-specific parameters.
+`response_format`. No `stream`.
 
-## Output
+Always set `response_format` (ADR-010). The gateway asks for `json_schema`
+derived from the output model; if the server rejects it with a 400, the call is
+retried once with `json_object`.
 
-Require JSON:
+## Output and validation
+
+The model must answer:
 
 ```json
 {
@@ -47,43 +100,53 @@ Require JSON:
 }
 ```
 
-Always set `response_format`. Probe for `json_schema` and use it if the
-endpoint accepts it; otherwise send
-`response_format={"type": "json_object"}`. Observed with the default local
-model: without the flag it spends hundreds of tokens on reasoning and wraps the
-JSON in a code fence; with it, output is clean and about 5x faster.
+Every response is validated before it is returned:
 
-## Validators
+- JSON parses and matches the schema.
+- Changes are in text order, non-overlapping, and each `original` occurs in the
+  source.
+- Length ratio is within 0.5–2.0.
+- Numbers, URLs, emails, inline code, and fenced code are unchanged.
+- Re-checking `rewritten` with LanguageTool adds no rule ID that the original
+  did not already trigger.
 
-Reject or retry when:
+A failed validation triggers one stricter retry. A second failure returns
+`502 llm_validation_failed`; unvalidated model text is never returned.
 
-- output is not valid JSON or does not match the schema,
-- a replacement is empty where text is required,
-- length ratio is outside 0.5–2.0,
-- numbers, names, URLs, or code blocks changed,
-- re-checking the replacement with LanguageTool adds new errors,
-- the model echoes the input unchanged (for rewrite requests).
+Names are not checked by a tokenizer. They rely on the LanguageTool re-check
+and on the user reviewing the diff before accepting.
 
-## Chunking
+## Caching
 
-- Chunk by paragraph against `LLM_CONTEXT_CHARS`, with margin.
-- Do not assume a tokenizer. `tiktoken` is OpenAI-specific and misleading for
-  other models.
-- Preserve paragraph boundaries so offsets remain mappable.
+Successful rewrites are cached in process memory, keyed by text, language,
+mode, and instruction. The cache is an LRU bounded by `LLM_CACHE_SIZE` and is
+lost on restart. Errors and rejected responses are not cached.
 
-## Determinism
+## Errors
 
-`temperature` 0.1–0.3 for corrections, 0 for consistency checks. `seed` is
-best-effort. The eval set, not the seed, catches drift.
-
-## Failure handling
-
-- Timeout or connection error → 503 with a stable error code.
-- Invalid JSON → one retry with a stricter instruction, then 502.
-- Never fall back to unvalidated text.
+| Status | Code | Cause |
+|---|---|---|
+| 400 | `invalid_body` | Body is not JSON |
+| 400 | `invalid_request` | Missing or invalid field |
+| 400 | `unknown_mode` | Mode is not defined |
+| 400 | `unsupported_language` | No prompt for the language |
+| 413 | `text_too_long` | Input exceeds `LLM_CONTEXT_CHARS` |
+| 502 | `llm_invalid_request` | Endpoint rejected the request |
+| 502 | `llm_error` | Other upstream error |
+| 502 | `llm_validation_failed` | Both attempts failed validation |
+| 503 | `llm_unavailable` | Timeout or connection failure |
+| 503 | `languagetool_unavailable` | Re-check could not run |
 
 ## Privacy
 
 - Local Ollama is the default; no text leaves the machine.
 - Hosted endpoints are opt-in and are the user's responsibility.
-- Do not log prompts or completions by default.
+- Prompts and completions are never logged.
+
+## Chunking
+
+Not implemented. A selection longer than `LLM_CONTEXT_CHARS` is rejected with
+`text_too_long`; select a shorter passage. Chunking can be added without
+changing the response shape.
+
+`shortcut: rewrites are single-chunk, add paragraph chunking if whole-document rewrites become a use case.`

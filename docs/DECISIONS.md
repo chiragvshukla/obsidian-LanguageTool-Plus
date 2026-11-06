@@ -167,6 +167,28 @@ checks no longer crash. The first request after a container start still costs
 ~4 s. Misspelled words remain slow (~0.9-1.4 s) because Hunspell generates
 suggestions; that path is unaffected by caching.
 
+## ADR-013 — Rewrite is explicit, validated, and gated in the plugin
+
+**Status:** accepted
+
+**Context:** an LLM can change meaning, invent facts, or return malformed text.
+Inline checking must remain deterministic and usable without any model running.
+
+**Decision:** the LLM is reachable only through `POST /rewrite`, called by an
+explicit user action. `/v2/check` never calls the model. Every rewrite is
+validated (schema, ordered non-overlapping changes, length ratio, protected
+numbers/URLs/emails/code, LanguageTool re-check) and one stricter retry is made
+before returning `502 llm_validation_failed`; unvalidated text is never sent.
+Prompts are `prompts/<language>/<mode>.md` and a missing prompt fails startup.
+The plugin exposes a single "Enable AI features" switch, default off, that
+gates every AI command and inline suggestion. The gateway has no master switch:
+the plugin decides.
+
+**Consequences:** the stack works fully without an LLM, and a hosted endpoint
+cannot be reached by accident. The validator chain is the quality boundary, so
+it must run on every rewrite. `shortcut: rewrites are single-chunk; selections
+over `LLM_CONTEXT_CHARS` return `413 text_too_long` until chunking is added.`
+
 ## Phase 0 findings
 
 - LanguageTool: prebuilt image + bind-mounted `grammar_custom.xml` works; the

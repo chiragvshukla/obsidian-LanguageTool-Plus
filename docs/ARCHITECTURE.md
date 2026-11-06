@@ -84,10 +84,14 @@ implementation. They are explicit rewrite actions.
 ## Request flow (rewrite)
 
 1. Plugin sends `POST /rewrite` with `{text, language, mode, instruction}`.
-2. Gateway builds the mode prompt and calls the OpenAI-compatible endpoint.
-3. Response is validated (JSON shape, length ratio, numbers/names preserved,
-   re-checked by LanguageTool).
-4. Gateway returns `{original, rewritten, changes}`.
+2. Gateway resolves the mode and loads `prompts/<language>/<mode.prompt>`.
+3. Gateway calls the OpenAI-compatible endpoint with `response_format`.
+4. Response is validated (JSON shape, ordered changes, length ratio,
+   numbers/links/code preserved, re-checked by LanguageTool).
+5. Gateway returns `{original, rewritten, changes}`.
+
+A failed validation gets one stricter retry; nothing unvalidated is returned.
+Successful rewrites are cached in memory. Inline checks never call the LLM.
 
 ## State
 

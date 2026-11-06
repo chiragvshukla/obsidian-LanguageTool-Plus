@@ -31,6 +31,7 @@ class Settings(BaseSettings):
     llm_timeout_seconds: float = 30.0
     llm_max_tokens: int = 1024
     llm_context_chars: int = 12000
+    llm_cache_size: int = 128
 
     # Gateway
     log_level: str = "INFO"

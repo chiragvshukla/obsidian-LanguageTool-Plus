@@ -48,5 +48,5 @@ enabled_rules:
   - WELCHE_SUBMAS_IST
   - WERDEN_FOLGENDEN_SUB
   - ZUSAMMENSCHREIBUNG_DAZU
-prompt: prompts/de/formal.md
+prompt: formal.md
 temperature: 0.2

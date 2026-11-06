@@ -27,5 +27,5 @@ enabled_rules:
   - WELCHE_SUBMAS_IST
   - WERDEN_FOLGENDEN_SUB
   - ZUSAMMENSCHREIBUNG_DAZU
-prompt: prompts/de/casual.md
+prompt: casual.md
 temperature: 0.4

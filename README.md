@@ -15,17 +15,19 @@ It combines three open parts:
 The optional Obsidian plugin fork adds per-note modes and a rewrite command.
 The upstream plugin already works against the gateway in pass-through mode.
 
-> **Status:** Phase 1. The gateway proxies `/v2/check` and `/v2/languages` and
-> applies writing modes. Rewrites and inline AI suggestions follow
-> `docs/PLAN.md`.
+> **Status:** Phase 3. The gateway proxies `/v2/check` and `/v2/languages`,
+> applies writing modes, and serves `POST /rewrite`. Inline AI suggestions
+> follow `docs/PLAN.md`.
 
 ## Requirements
 
 - Docker Desktop (or Docker Engine + Compose) for LanguageTool
 - [uv](https://docs.astral.sh/uv/) for the gateway
 - Obsidian
-- An OpenAI-compatible LLM endpoint. Ollama is the local default but is not
-  part of this repository: it runs natively and is addressed by URL.
+- *Optional:* an OpenAI-compatible LLM endpoint for `POST /rewrite`. Ollama is
+  the local default but is not part of this repository: it runs natively and is
+  addressed by URL. Without it, checking still works and `/rewrite` returns
+  `503 llm_unavailable`.
 
 ## Quick start
 
@@ -45,8 +47,16 @@ Invoke-RestMethod http://127.0.0.1:8077/healthz
 ```
 
 Ollama is expected to be running already, at the URL in `LLM_BASE_URL`
-(`http://127.0.0.1:11434/v1` by default). Any compatible server works; the
-gateway knows nothing about which one.
+(`http://127.0.0.1:11434/v1` by default). It is only used by `POST /rewrite`.
+Any compatible server works; the gateway knows nothing about which one.
+
+Try a rewrite:
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:8077/rewrite `
+  -Method Post -ContentType "application/json" `
+  -Body '{"text":"Das ist ein Tset.","language":"de-DE","mode":"formal"}'
+```
 
 In Obsidian, install the LanguageTool plugin and set its endpoint to
 `http://127.0.0.1:8077` (the plugin appends `/v2` itself). Port `8010` is

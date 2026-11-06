@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -30,6 +31,13 @@ class Mode(BaseModel):
     def _valid_id(cls, value: str) -> str:
         if not value or not all(char.isalnum() or char in "-_" for char in value):
             raise ValueError("mode id must contain only letters, digits, '-' and '_'")
+        return value
+
+    @field_validator("prompt")
+    @classmethod
+    def _valid_prompt(cls, value: str) -> str:
+        if value and (Path(value).name != value or value in {".", ".."}):
+            raise ValueError("prompt must be a file name resolved under prompts/<language>/")
         return value
 
     @model_validator(mode="after")

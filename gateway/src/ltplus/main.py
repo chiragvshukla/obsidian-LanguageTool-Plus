@@ -8,12 +8,15 @@ from contextlib import asynccontextmanager
 
 import httpx
 from fastapi import FastAPI
+from openai import AsyncOpenAI
 
 from ltplus import __version__
 from ltplus.api import router
 from ltplus.config import Settings, get_settings
 from ltplus.lexicon import load_lexicon, validate_modes
 from ltplus.modes import ModeConfigError, load_modes
+from ltplus.rewrite import RewriteCache, load_prompts
+from ltplus.rewrite import router as rewrite_router
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -31,6 +34,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     lexicon = load_lexicon(settings.rules_dir / "lexicon.yaml")
     validate_modes(lexicon, set(modes))
+    prompts = load_prompts(settings.prompts_dir, modes)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -39,7 +43,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             timeout=settings.lt_timeout_seconds,
         ) as client:
             app.state.lt = client
-            yield
+            app.state.llm = AsyncOpenAI(
+                base_url=settings.llm_base_url,
+                api_key=settings.llm_api_key,
+                timeout=settings.llm_timeout_seconds,
+                max_retries=0,
+            )
+            try:
+                yield
+            finally:
+                await app.state.llm.close()
 
     app = FastAPI(
         title="LanguageToolPlus",
@@ -51,7 +64,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.settings = settings
     app.state.modes = modes
     app.state.lexicon = lexicon
+    app.state.prompts = prompts
+    app.state.rewrite_cache = RewriteCache(settings.llm_cache_size)
     app.include_router(router)
+    app.include_router(rewrite_router)
 
     @app.get("/healthz")
     def healthz() -> dict[str, str]:
