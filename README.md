@@ -22,6 +22,16 @@ against the gateway in pass-through mode.
 > serves `POST /rewrite`. Whole-document inline AI suggestions remain deferred;
 > see `docs/PLAN.md`.
 
+> **Built with AI (vibe coding).** This is a personal project, developed largely
+> with AI coding assistants. Changes are reviewed and tested before use, but
+> expect rough edges and verify anything you depend on.
+>
+> **AI features.** Rewrites, AI checks, and the optional paragraph auto-check
+> send text to the OpenAI-compatible endpoint you configure, which defaults to a
+> local Ollama instance. The plugin's "Enable AI features" switch is off by
+> default, and nothing is sent while it is off. If you point the gateway at a
+> hosted API, that provider's terms and privacy policy apply.
+
 ## Requirements
 
 - Docker Desktop (or Docker Engine + Compose) for LanguageTool
