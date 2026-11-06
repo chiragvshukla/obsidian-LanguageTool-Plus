@@ -30,11 +30,12 @@ export interface RewriteResult {
 export async function requestRewrite(
   settings: LanguageToolPluginSettings,
   text: string,
-  language?: string
+  language?: string,
+  mode?: string
 ): Promise<RewriteResult> {
   const body: Record<string, string> = {
     text,
-    mode: settings.writingMode ?? "neutral"
+    mode: mode ?? settings.writingMode ?? "neutral"
   };
   if (language) {
     body.language = language;

@@ -362,13 +362,44 @@ export default class LanguageToolPlugin extends Plugin {
     });
   }
 
+  /**
+   * Resolve the rewrite language. A note's frontmatter wins, then a static
+   * setting, then a short LanguageTool detection probe. Without the probe an
+   * English selection would fall back to the gateway's German default.
+   */
+  private async getRewriteLanguage(text: string): Promise<string | undefined> {
+    const file = this.app.workspace.getActiveFile();
+    const pinned = getDocumentLanguage(this.app, file);
+    if (pinned) {
+      return pinned;
+    }
+    const staticLanguage = this.settings.staticLanguage;
+    if (staticLanguage && staticLanguage !== "auto") {
+      return staticLanguage;
+    }
+    try {
+      const detected = await getDetectionResult(
+        text.slice(0, 500),
+        () => this.settings,
+        this.getCredentials(),
+        { language: "auto" }
+      );
+      return detected.language?.code;
+    } catch {
+      return undefined;
+    }
+  }
+
   private async rewriteSelection(editor: Editor): Promise<void> {
     const text = editor.getSelection();
-    const language = this.settings.staticLanguage;
+    const file = this.app.workspace.getActiveFile();
+    const mode = getDocumentMode(this.app, file) ?? this.settings.writingMode;
+    const language = await this.getRewriteLanguage(text);
     const { rewritten, changes } = await requestRewrite(
       this.settings,
       text,
-      language && language !== "auto" ? language : undefined
+      language,
+      mode
     );
 
     if (rewritten === text) {

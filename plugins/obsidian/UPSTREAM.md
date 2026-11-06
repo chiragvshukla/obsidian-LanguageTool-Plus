@@ -39,9 +39,13 @@ unmodified upstream files except where listed below. The upstream `test/` and
      cache key, and passes it to the request.
 
 The gateway URL is the existing `serverUrl` setting (bare origin, no `/v2`
-suffix). The rewrite language is the static language setting when it is set
-and not `auto`; otherwise the gateway default applies. The rewrite mode is the
-same `writingMode` setting used by checks.
+suffix). A rewrite resolves the language like a check does: the note's
+frontmatter language first, then a static language setting, then a short
+LanguageTool detection probe (the first 500 characters with `language=auto`).
+A failed probe leaves the language unset so the gateway default applies.
+
+A rewrite also uses the note's `lt-mode` frontmatter when present and falls
+back to the same `writingMode` setting used by checks.
 
 ## Building
 

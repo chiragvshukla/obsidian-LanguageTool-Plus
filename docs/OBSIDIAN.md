@@ -31,13 +31,19 @@ Frontmatter keys, in precedence order: `lt-language`, `language`, `lang`.
 `lt-language: auto` re-enables detection. Varieties (`de-DE`, `de-AT`,
 `de-CH`, `en-US`, `en-GB`, …) apply only while auto-detecting.
 
+Checks and rewrites resolve the language the same way: frontmatter first, then
+the static setting, then detection. For a rewrite the detection probe checks
+the first 500 characters of the selection with `language=auto`, so an English
+selection does not fall back to the gateway's German default. If the probe
+fails, the language is omitted and the gateway default applies.
+
 ## Writing modes
 
 The plugin's "Writing mode" setting is sent as `writing_mode` on every check
 and as `mode` on `POST /rewrite`. Only a custom endpoint receives the
 parameter, so the official LanguageTool API never sees it.
 
-A note can override the mode with frontmatter:
+A note can override the mode for both checks and rewrites with frontmatter:
 
 ```yaml
 lt-mode: formal
