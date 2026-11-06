@@ -122,15 +122,30 @@ export function sentenceAt(
   const boundary = /[.!?…]+(?=\s|$)/g;
   let start = 0;
   let end = text.length;
+  // Start and end of the segment before `start`, used when the caret sits in
+  // the whitespace after a sentence end.
+  let previousStart = 0;
+  let previousEnd = 0;
   let match: RegExpExecArray | null;
   while ((match = boundary.exec(text)) !== null) {
     const after = match.index + match[0].length;
-    if (after <= local) {
+    // `<` keeps a period exactly at the caret in the sentence it ends; `<=`
+    // would start an empty sentence after it.
+    if (after < local) {
+      previousStart = start;
+      previousEnd = after;
       start = after;
       continue;
     }
     end = after;
     break;
+  }
+
+  // A caret right after the last period, or in the space behind it, still
+  // belongs to that sentence.
+  if (!text.slice(start, end).trim() && start > 0) {
+    start = previousStart;
+    end = previousEnd;
   }
 
   const raw = text.slice(start, end);

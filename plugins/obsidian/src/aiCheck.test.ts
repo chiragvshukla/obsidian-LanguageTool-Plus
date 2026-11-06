@@ -58,11 +58,29 @@ equal(sentenceAt(sentences, 13), {
   to: 26,
   text: "Zweiter Satz!"
 });
-// A cursor on the space after a sentence belongs to the next sentence.
-equal(sentenceAt(sentences, 12)?.text, "Zweiter Satz!");
+// A cursor on the space after a sentence belongs to the sentence it ends.
+equal(sentenceAt(sentences, 12)?.text, "Erster Satz.");
 equal(sentenceAt(sentences, 34)?.text, "Dritter?");
 equal(sentenceAt(doc, doc.line(2).from), null);
 equal(sentenceAt(doc, doc.line(3).from)?.text, "second para\ncontinues");
+
+// The caret is normally at the end of the sentence that was just typed, which
+// must not produce an empty range.
+const single = Text.of(["Hallo Welt."]);
+equal(sentenceAt(single, single.length), {
+  from: 0,
+  to: 11,
+  text: "Hallo Welt."
+});
+// A trailing space belongs to the sentence in front of it.
+equal(sentenceAt(Text.of(["Hallo Welt. "]), 12)?.text, "Hallo Welt.");
+// No caret position in a normal paragraph may return nothing.
+for (let pos = 0; pos <= sentences.length; pos++) {
+  const range = sentenceAt(sentences, pos);
+  if (!range || !range.text.trim()) {
+    throw new Error(`sentenceAt returned nothing at position ${pos}`);
+  }
+}
 
 const aiDecoration = { spec: { match: { rule: { id: "AI_GRAMMAR" } } } };
 const ltDecoration = { spec: { match: { rule: { id: "MORFOLOGIK_RULE_DE_DE" } } } };
