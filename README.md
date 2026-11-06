@@ -53,7 +53,9 @@ See [`USAGE.md`](USAGE.md) for the full walkthrough.
 
 ## Requirements
 
-- Docker Desktop (or Docker Engine + Compose) for LanguageTool
+- Docker Desktop (or Docker Engine + Compose) for LanguageTool. On Windows,
+  use Docker Desktop with the WSL2 backend (`wsl --install` if WSL2 is missing);
+  the Linux container image cannot run on WSL1.
 - [uv](https://docs.astral.sh/uv/) for the gateway
 - Obsidian
 - *Optional:* an OpenAI-compatible LLM endpoint for `POST /rewrite`. Ollama is

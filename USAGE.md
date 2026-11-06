@@ -17,7 +17,9 @@ addressed by URL, so either can be replaced without touching the other.
 
 ## Prerequisites
 
-- Docker Desktop (or Docker Engine + Compose)
+- Docker Desktop (or Docker Engine + Compose). On Windows this means Docker
+  Desktop with the WSL2 backend; run `wsl --install` if WSL2 is missing. The
+  LanguageTool image is Linux-only and does not run on WSL1.
 - [uv](https://docs.astral.sh/uv/) and Python 3.12 (uv installs the interpreter)
 - Node.js 18+ and npm, to build the plugin
 - Obsidian desktop 1.8.10 or newer
@@ -311,6 +313,7 @@ The gateway suite mocks LanguageTool and the LLM; it needs neither running.
 | AI auto-check seems idle | It runs 4 seconds after the last edit or cursor move and only while the editor has focus. Use **Check current paragraph with AI** to test immediately. |
 | Port already in use | Stop the old gateway/container. The defaults are `8010` for LanguageTool and `8077` for the gateway. |
 | Container is unhealthy | `docker compose logs languagetool`; wait for the first start, then check memory limits. |
+| Docker fails to start on Windows | Docker Desktop needs the WSL2 backend. Run `wsl --install`, reboot, and confirm `wsl --status` reports WSL2. |
 
 ## 11. Stop and uninstall
 
