@@ -37,9 +37,6 @@ in-memory cache.
 - Do not copy code, rules, prose, or data unless its license allows it. Record
   every borrowed item in `docs/PROVENANCE.md` with source URL, license, and
   commit/version.
-- Explicitly forbidden: the third-party browser extension,
-  LanguageTool Closed rules, and non-open content from the LanguageTool
-  website.
 - Preserve all license headers and NOTICE files. Do not relicense third-party
   code.
 - Any new dependency must have a compatible license and a one-line
@@ -151,6 +148,5 @@ uv run uvicorn ltplus.main:app --host 127.0.0.1 --port 8077
 
 ## 9. Out of scope
 
-Team features, multi-user auth, rule parity, per-paragraph
-mixed-language checking, mobile apps, and redistributing the third-party
-browser extension.
+Team features, multi-user auth, per-paragraph mixed-language checking, and
+mobile apps.

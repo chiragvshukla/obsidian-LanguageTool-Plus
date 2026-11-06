@@ -47,8 +47,6 @@ terms:
 - The client can turn a term off with `disabledRules=EMAIL_HYPHEN` or all
   gateway terms off with `disabledCategories=LT_PLUS`.
 
-Rules must be written from scratch. Do not copy LanguageTool closed rule text.
-
 ## Document consistency
 
 The gateway also reads the whole checked text and adds at most one match per

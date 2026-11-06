@@ -177,5 +177,4 @@ in `plugins/obsidian/UPSTREAM.md` and keep the AGPL-3.0 license.
 
 ## Out of scope
 
-Mixed-language checking, mobile apps, and redistributing the third-party
-browser extension.
+Mixed-language checking and mobile apps.

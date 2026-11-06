@@ -13,8 +13,7 @@ run a modified version as a service, users must be able to obtain the source.
   link against it or modify its Java.
 - If that ever changes, LGPL obligations apply: publish modifications and allow
   relinking.
-- LanguageTool Closed rules are closed source. We do not copy, scrape, or
-  redistribute them.
+- Closed-source rule sets are not copied, scraped, or redistributed.
 - The container comes from https://github.com/Erikvl87/docker-languagetool
   (LGPL-2.1), published as `erikvl87/languagetool`.
 
@@ -32,12 +31,6 @@ run a modified version as a service, users must be able to obtain the source.
 - `plugins/obsidian/main.js` bundles MIT-licensed JavaScript packages. Their
   copyright notices and license text are in `THIRD_PARTY_NOTICES.md`; keep that
   file with any distributed build.
-
-## Third-party browser extension
-
-The current official LanguageTool browser extension is **All Rights Reserved**.
-Do not copy, decompile, or redistribute its code. The old LGPL-2.1 add-on is
-archived and not a drop-in base.
 
 ## Models and data
 

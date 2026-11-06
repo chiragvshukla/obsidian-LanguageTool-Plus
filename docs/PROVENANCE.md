@@ -12,12 +12,6 @@ lands in the repository.
 | LanguageTool Docker image | https://github.com/Erikvl87/docker-languagetool | LGPL-2.1 | Prebuilt image `erikvl87/languagetool:6.8` in `docker-compose.yml` | Not vendored; source is upstream |
 | Bundled plugin libraries | npm, see `THIRD_PARTY_NOTICES.md` | MIT | Bundled into `plugins/obsidian/main.js` by esbuild | 40 packages; notices and MIT text recorded |
 
-## Explicitly not used
-
-- The third-party browser extension (All Rights Reserved).
-- LanguageTool Closed rule packs.
-- Any rule text copied from the LanguageTool website.
-
 ## How to add an entry
 
 1. Add a row with the exact URL, license, and version/commit.

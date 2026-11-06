@@ -45,6 +45,9 @@ data/wordbook/*
 models/
 *.gguf
 
+# Local build log (kept on disk, not published)
+docs/PLAN.md
+
 # OS / editor
 .DS_Store
 Thumbs.db

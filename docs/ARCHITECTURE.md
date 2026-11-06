@@ -130,5 +130,5 @@ in source.
 
 ## Non-goals
 
-Multi-user auth, team features, rule parity, per-paragraph
-mixed-language checking, and forking the third-party browser extension.
+Multi-user auth, team features, per-paragraph mixed-language checking, and
+mobile apps.

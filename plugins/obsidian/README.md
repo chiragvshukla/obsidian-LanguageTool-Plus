@@ -2,7 +2,7 @@
 
 Check grammar and spelling with [LanguageTool](https://languagetool.org/) without leaving [Obsidian](https://obsidian.md). Run a check on the whole document or just the selected text, or let the plugin check automatically as you type. Mistakes are underlined in the editor; click one to review suggestions, apply a correction, or add the word to your personal dictionary.
 
-The plugin works with the free public LanguageTool API, with [LanguageTool](#hosted-api), and with [self-hosted servers](#privacy-and-self-hosting), so your notes never have to leave your own infrastructure.
+The plugin works with the free public LanguageTool API and with [self-hosted servers](#privacy-and-self-hosting), so your notes never have to leave your own infrastructure.
 
 ![demo-02022022](https://user-images.githubusercontent.com/98941594/152318322-83abb30d-fee0-44cf-9700-262f4c0de4c4.png)
 
@@ -100,13 +100,11 @@ tags:
 
 - **Endpoint**: which LanguageTool server to use.
   - **(Standard) api.languagetool.org**: the free public API. Rate-limited to 20 requests per minute per IP, texts up to 20,000 characters.
-  - **hosted LanguageTool API**: the hosted API. Requires the username and API key described under [Account setup](#account-setup).
   - **Custom URL**: your own server, see [Privacy and self-hosting](#privacy-and-self-hosting). Enter only the base URL (for example `http://localhost:8010`); the plugin adds the API path itself.
-- **API Username**: the email address of your LanguageTool registered account. Only needed for the authenticated endpoint.
-- **API Key**: your LanguageTool API key. Only needed for the authenticated endpoint.
+- **API Username / API Key**: only needed when your LanguageTool server requires authentication.
 - **Store API key securely (this device only)**: keeps the API key in Obsidian's encrypted SecretStorage instead of in plaintext in the plugin settings. Requires Obsidian 1.11.4 or newer. See [API key storage](#api-key-storage-synced-plaintext-vs-secure-storage) for the trade-offs.
 - **Autocheck Text**: check automatically as you type.
-- **AutoCheck Delay (ms)**: how long to wait after the last keystroke before checking. The minimum depends on the endpoint, because each endpoint allows a different number of requests per minute: 3000 ms on standard, 750 ms on the hosted endpoint, 50 ms on custom.
+- **AutoCheck Delay (ms)**: how long to wait after the last keystroke before checking. The minimum depends on the endpoint, because each endpoint allows a different number of requests per minute: 3000 ms on the public API, 50 ms on a custom server.
 - **Ribbon Icon**: shows an icon in the ribbon that checks the current document. Off by default. You can also hide the icon later by right-clicking the ribbon, the same way as for any other plugin.
 - **Glass Background**: renders the suggestion popover with a translucent background instead of the theme's secondary background color.
 - **Static Language**: forces one language for all checks. The default, **Auto Detect**, is usually the better choice: LanguageTool detects the language per paragraph, so you can mix languages within one document. Setting a static language clears any configured language varieties.
@@ -126,7 +124,7 @@ When auto-detect recognizes a language that has regional variants, it cannot kno
 
 ## Privacy and self-hosting
 
-Checking text means sending it to the configured LanguageTool server. With the standard or authenticated endpoint, that is LanguageTool's cloud; their [privacy policy](https://languagetool.org/legal/privacy) applies. The plugin only ever sends the text being checked (the whole document, the selection, or the changed lines during autocheck), never your whole vault.
+Checking text means sending it to the configured LanguageTool server. With the public API, that is LanguageTool's cloud; their [privacy policy](https://languagetool.org/legal/privacy) applies. The plugin only ever sends the text being checked (the whole document, the selection, or the changed lines during autocheck), never your whole vault.
 
 If you do not want your notes to leave your machine, run your own LanguageTool server and point the plugin at it with the **Custom URL** endpoint. The easiest way is the [Docker image](https://hub.docker.com/r/erikvl87/languagetool):
 
@@ -135,14 +133,6 @@ docker run -d --name languagetool -p 8010:8010 erikvl87/languagetool
 ```
 
 Then set the endpoint to Custom URL and enter `http://localhost:8010`.
-
-## Account setup
-
-The plugin supports LanguageTool:
-
-1. Generate an API key at https://languagetool.org/editor/settings/access-tokens (a registered account is required).
-2. In the plugin settings, switch the endpoint to **hosted LanguageTool API**.
-3. Enter your account email as the API Username and the generated key as the API Key.
 
 ⚠️ Please report bugs and issues with this plugin to this GitHub repository, and ***not*** to the LanguageTool support: this is an unofficial community plugin.
 
